@@ -1,0 +1,12 @@
+#!/bin/bash
+# WhisperTux Launcher Script
+cd "/home/cjams/dev/whispertux"
+
+# Check if virtual environment exists
+if [ -f "/home/cjams/dev/whispertux/venv/bin/python" ]; then
+    "/home/cjams/dev/whispertux/venv/bin/python" main.py "$@"
+else
+    echo "Error: Virtual environment not found. Please run setup.py first."
+    echo "python3 setup.py"
+    exit 1
+fi

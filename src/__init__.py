@@ -1,0 +1,3 @@
+"""
+WhisperTux source modules
+"""
