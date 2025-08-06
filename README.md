@@ -4,7 +4,7 @@ Simple voice dictation application for Linux. Uses [whisper.cpp](https://github.
 No fancy GPUs are required although whisper.cpp is capable of using them if available. Once your speech is transcribed, it is sent to a
 [ydotool daemon](https://github.com/ReimuNotMoe/ydotool) that will write the text into the focused application.
 
-Super useful voice prompting AI models and terminal commands. 
+Super useful voice prompting AI models and speaking terminal commands. 
 
 
 https://github.com/user-attachments/assets/6f7a2d26-06ae-4ba3-bdc8-1e3cba1b04be
