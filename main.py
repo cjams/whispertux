@@ -706,7 +706,7 @@ class WhisperTuxApp:
         # Create main window with ttkbootstrap
         self.root = ttk_style.Window(
             title="WhisperTux - Voice Dictation",
-            themename="darkly",  # Nice dark theme, can be changed
+            themename="darkly",
             size=(480, 600),
             resizable=(True, True),
             minsize=(480, 500)
@@ -775,14 +775,16 @@ class WhisperTuxApp:
         self.main_frame = self.scrollable_frame
         
     def _position_window(self):
-        """Position window in top-right corner like the original Electron app"""
+        """Position window in bottom-left corner of the screen"""
         self.root.update_idletasks()
         screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
         window_width = 480
-        x_position = screen_width - window_width - 20  # 20px margin from right
-        y_position = 20  # 20px from top
+        window_height = 600
+        x_position = 20  # 20px margin from left
+        y_position = screen_height - window_height - 20  # 20px margin from bottom
         
-        self.root.geometry(f"{window_width}x600+{x_position}+{y_position}")
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
         
     def _create_header(self):
         """Create the application header"""
