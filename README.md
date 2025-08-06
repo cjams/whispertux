@@ -83,7 +83,7 @@ Settings are stored in `~/.config/whispertux/config.json`:
 ### Available Models
 
 Any [whisper](https://github.com/openai/whisper) model is usable. By default the 
-base model is downloaded and used. You can download additional models from within the app settings.
+base model is downloaded and used. You can download additional models from within the app.
 
 ## System Requirements
 
