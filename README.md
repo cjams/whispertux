@@ -1,15 +1,18 @@
 # WhisperTux
 
-Voice dictation application for Linux using whisper.cpp for offline speech-to-text transcription.
+Simple voice dictation application for Linux. Uses [whisper.cpp](https://github.com/ggml-org/whisper.cpp) for offline speech-to-text transcription.
+No fancy GPUs are required although whisper.cpp is capable of using them if available. Once your speech is transcribed, it is sent to a
+[ydotool daemon](https://github.com/ReimuNotMoe/ydotool) that will write the text into the focused application.
+
+Super useful voice prompting AI models and terminal commands.
 
 ## Features
 
-- Real-time audio recording with level monitoring
 - Local speech-to-text processing via whisper.cpp (no cloud dependencies)
+- No expensive hardware required (works well on a plain x86 laptop with AVX instructions)
 - Global keyboard shortcuts for system-wide operation
 - Automatic text injection into focused applications
-- Configurable whisper models and shortcuts
-- Intelligent text preprocessing for punctuation commands
+- Configurable [whisper](https://github.com/openai/whisper) models and shortcuts
 
 ## Installation
 
@@ -21,7 +24,17 @@ cd whispertux
 python3 setup.py
 ```
 
-The setup script handles everything: system dependencies, creating Python virtual environment, building whisper.cpp, downloading models, configuring services, and testing the installation.
+The setup script handles everything: system dependencies, creating Python virtual environment, building whisper.cpp, downloading models, configuring services, and testing the installation. See [setup.md](docs/setup.md) for details.
+
+## Usage
+
+Start the application:
+
+```bash
+./whispertux
+# or
+python3 main.py
+```
 
 ### Desktop Integration (Optional)
 
@@ -38,36 +51,12 @@ This will:
 - Optionally configure it to start automatically on login
 - Create proper desktop integration for launching from GUI
 
-## Usage
-
-Start the application:
-
-```bash
-./whispertux
-# or
-python3 main.py
-```
-
 ### Basic Operation
 
-1. Press F12 to start recording
+1. Press $GLOBAL_SHORTCUT (configurable within the app) to start recording
 2. Speak clearly into your microphone
-3. Press F12 again to stop recording
+3. Press $GLOBAL_SHORTCUT again to stop recording
 4. Transcribed text appears in the currently focused application
-
-### Keyboard Shortcuts
-
-- F12: Toggle recording (configurable)
-
-### Voice Commands
-
-Spoken punctuation is automatically converted:
-
-- "period" becomes "."
-- "comma" becomes ","
-- "question mark" becomes "?"
-- "new line" creates a line break
-- "tab" inserts a tab character
 
 ## Configuration
 
@@ -87,27 +76,18 @@ Settings are stored in `~/.config/whispertux/config.json`:
 
 ### Available Models
 
-- base: Balanced speed and accuracy (recommended)
-- small: Faster processing, reduced accuracy
-- medium: Higher accuracy, slower processing
-- large: Highest accuracy, slowest processing
+Any [whisper](https://github.com/openai/whisper) model is usable. By default the 
+base model is downloaded and used. You can download additional models from within the app settings.
 
-## Requirements
+## System Requirements
 
-- Linux (Ubuntu, Debian, Fedora, Arch Linux)
-- Python 3.8+
+- Linux with a GUI. Has only been tested on GNOME/Ubuntu but should work on others. Depends on evdev for handling low-level input events
+- Python 3
 - Microphone access
 
 ## Troubleshooting
 
 ### Global Shortcuts Not Working
-
-Most commonly caused by Wayland desktop environment restrictions. Switch to X11 session for better compatibility:
-
-```bash
-echo $XDG_SESSION_TYPE  # Check if using Wayland
-# Log out and select "Ubuntu on Xorg" at login
-```
 
 Test shortcut functionality:
 
@@ -143,7 +123,7 @@ This script will:
 - Create the necessary udev rule for `/dev/uinput` access
 - Reload udev rules
 
-You may need to log out and back in for group changes to take effect.
+You may need to log out and back in or reboot for group changes to take effect.
 
 Verify ydotoold service status:
 
