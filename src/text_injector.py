@@ -31,11 +31,13 @@ class TextInjector:
             print("⚠️  ydotool not found - text injection will use clipboard fallback")
 
     def _check_ydotool(self) -> bool:
-        """Check if ydotool is available on the system"""
+        """Check if ydotool is available on the atiystem"""
         try:
             result = subprocess.run(['which', 'ydotool'],
                                   capture_output=True, text=True, timeout=5)
             return result.returncode == 0
+
+
         except:
             return False
 
@@ -53,10 +55,15 @@ class TextInjector:
             print("No text to inject (empty or whitespace)")
             return True
 
-        # Preprocess the text to handle common speech-to-text corrections
+        # Preprocess the text to handle unwanted carriage returns and speech-to-text corrections
         processed_text = self._preprocess_text(text)
-
-        print(f"Injecting text: '{processed_text}'")
+        
+        # Show preprocessing result if text was changed
+        if processed_text != text:
+            print(f"Original text: '{text}'")
+            print(f"Processed text: '{processed_text}'")
+        else:
+            print(f"Injecting text: '{processed_text}'")
 
         try:
             # Try ydotool first if available
@@ -81,12 +88,15 @@ class TextInjector:
 
     def _preprocess_text(self, text: str) -> str:
         """
-        Preprocess text to handle common speech-to-text corrections
+        Preprocess text to handle common speech-to-text corrections and remove unwanted line breaks
         """
+        import re
+        
+        # First, convert unwanted carriage returns and newlines to spaces
+        # This prevents accidental "Enter" key presses in applications
+        processed = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+        
         # Handle common speech-to-text corrections
-        processed = text
-
-        # Punctuation commands
         replacements = {
             r'\bperiod\b': '.',
             r'\bcomma\b': ',',
@@ -94,7 +104,7 @@ class TextInjector:
             r'\bexclamation mark\b': '!',
             r'\bcolon\b': ':',
             r'\bsemicolon\b': ';',
-            r'\bnew line\b': '\n',
+            r'\btux enter\b': '\n',     # Special phrase for new line
             r'\btab\b': '\t',
             r'\bdash\b': '-',
             r'\bunderscore\b': '_',
@@ -104,7 +114,6 @@ class TextInjector:
             r'\bclose bracket\b': ']',
             r'\bopen brace\b': '{',
             r'\bclose brace\b': '}',
-            r'\bspace\b': ' ',
             r'\bat symbol\b': '@',
             r'\bhash\b': '#',
             r'\bdollar sign\b': '$',
@@ -125,40 +134,36 @@ class TextInjector:
             r'\bapostrophe\b': "'",
         }
 
-        import re
         for pattern, replacement in replacements.items():
             processed = re.sub(pattern, replacement, processed, flags=re.IGNORECASE)
 
-        # Clean up extra spaces
-        processed = re.sub(r'\s+', ' ', processed).strip()
+        # Clean up extra spaces but preserve intentional newlines
+        processed = re.sub(r'[ \t]+', ' ', processed)  # Multiple spaces/tabs to single space
+        processed = re.sub(r' *\n *', '\n', processed)  # Clean spaces around newlines
+        processed = processed.strip()
 
         return processed
 
     def _inject_via_ydotool(self, text: str) -> bool:
-        """Inject text using ydotool"""
+        """Inject text using ydotool with --delay 50 and raw text (no escaping)"""
         try:
-            # Escape text for shell command - handle single quotes properly
-            escaped_text = text.replace("'", "'\"'\"'")
-
-            # Use -- to separate options from text (handles text starting with dashes)
-            cmd = ['ydotool', 'type', '--', escaped_text]
-
-            print(f"Running ydotool command: {' '.join(cmd)}")
+            cmd = ['ydotool', 'type', '--delay', '50', text]
+            
+            print(f"Injecting text with ydotool: ydotool type --delay 50 [text]")
 
             # Run the command
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=60
             )
 
             if result.returncode == 0:
-                print(f"✓ ydotool injection successful")
+                print("✓ ydotool injection successful")
                 return True
             else:
-                print(f"✗ ydotool failed with return code {result.returncode}")
-                print(f"stderr: {result.stderr}")
+                print(f"✗ ydotool failed: {result.stderr}")
                 return False
 
         except subprocess.TimeoutExpired:

@@ -4,12 +4,9 @@ Simple voice dictation application for Linux. Uses [whisper.cpp](https://github.
 No fancy GPUs are required although whisper.cpp is capable of using them if available. Once your speech is transcribed, it is sent to a
 [ydotool daemon](https://github.com/ReimuNotMoe/ydotool) that will write the text into the focused application.
 
-Super useful voice prompting AI models and speaking terminal commands. 
+Super useful voice prompting AI models and speaking terminal commands.
 
 [Demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
-
-
-
 
 ## Features
 
@@ -63,6 +60,9 @@ This will:
 3. Press $GLOBAL_SHORTCUT again to stop recording
 4. Transcribed text appears in the currently focused application
 
+You can say 'tux enter' to simulate Enter keypress after you're done speaking for
+automated carriage return.
+
 ## Configuration
 
 Settings are stored in `~/.config/whispertux/config.json`:
@@ -81,7 +81,7 @@ Settings are stored in `~/.config/whispertux/config.json`:
 
 ### Available Models
 
-Any [whisper](https://github.com/openai/whisper) model is usable. By default the 
+Any [whisper](https://github.com/openai/whisper) model is usable. By default the
 base model is downloaded and used. You can download additional models from within the app.
 
 ## System Requirements
