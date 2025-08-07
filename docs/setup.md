@@ -1,14 +1,13 @@
 # WhisperTux Setup Guide
 
-This guide walks you through setting up WhisperTux on your Linux system with automatic dependency detection and installation.
+This guide walks you through setting up WhisperTux on your Linux system with dependency detection and installation.
 
 ## System Requirements
 
 - **Operating System**: Ubuntu 20.04+, Fedora 35+, Arch Linux, or similar
 - **Desktop Environment**: X11 or Wayland (both supported)
 - **Python**: Version 3.8 or higher
-- **Memory**: At least 2GB RAM (for Whisper models)
-- **Storage**: ~500MB for complete installation
+- **Storage**: ~140MB for default base.en model
 
 ## Quick Start
 
@@ -29,8 +28,8 @@ This command will:
 - Install system dependencies (build tools, ydotool)
 - Create Python virtual environment
 - Install Python dependencies
-- Build and compile Whisper.cpp
-- Download AI models (base.en)
+- Build and compile whisper.cpp
+- Download AI models (base.en by default)
 - Configure user permissions and services
 - Run tests to verify everything works
 
@@ -87,7 +86,7 @@ python3 main.py
 
 ### 1. Audio Permissions
 
-WhisperTux needs microphone access. When you first start it, your browser will prompt for permission. You can also verify audio setup:
+WhisperTux needs microphone access. You can also verify audio setup:
 
 ```bash
 # List audio devices
@@ -96,6 +95,7 @@ pactl list sources short
 # Test microphone (speak for 3 seconds)
 arecord -d 3 -f cd test.wav && aplay test.wav && rm test.wav
 ```
+Your user should be in the audio group. The setup script will check and add the current user to the audio group
 
 ### 2. Text Injection Setup
 
@@ -148,7 +148,7 @@ Test WhisperTux functionality:
 ### Basic Operation
 
 1. **Start recording**: Click microphone button or press F12 (default hotkey)
-2. **Speak clearly**: You'll see real-time audio level monitoring
+2. **Speak clearly**
 3. **Stop recording**: Press F12 again or click stop button
 4. **Text injection**: Transcribed words appear in the currently focused text field
 
@@ -259,37 +259,18 @@ Set in configuration:
 # Or install manually based on your distro (see Manual Installation above)
 ```
 
-**Python too old**
-
-```bash
-# Check Python version
-python3 --version
-
-# Ubuntu/Debian - Update Python
-sudo apt update && sudo apt install python3.10 python3.10-venv python3.10-dev
-
-# Fedora
-sudo dnf install python3.10 python3.10-pip
-
-# Arch Linux
-sudo pacman -S python python-pip
-```
-
 **Whisper.cpp compilation fails**
 
 ```bash
 # Try manual compilation with more verbose output
 cd whisper.cpp
+mkdir -p build
+cd build
+
+# Pass non-default cmake options here if you want
+cmake ..
 make clean
 make -j$(nproc) VERBOSE=1
-```
-
-**Model download fails**
-
-```bash
-# Manual download
-cd whisper.cpp/models
-curl -L -o ggml-base.en.bin "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
 ```
 
 ### Runtime Issues
@@ -323,36 +304,10 @@ curl -L -o ggml-base.en.bin "https://huggingface.co/ggerganov/whisper.cpp/resolv
    # If issues persist, you may need to reboot for udev changes to take effect
    ```
 
-**Performance issues**
-
-1. Switch to `small.en` model for faster processing
-2. Reduce CPU usage: Lower thread count in config or whisper manager
-3. Close memory-intensive applications
-
 **Hotkeys not working**
 
 1. Check if another application is using the same shortcuts
 2. Test evdev access: Run `./scripts/fix-uinput-permissions.sh` if needed
-3. Restart WhisperTux if hotkeys stop working
-
-### System-Specific Issues
-
-**Ubuntu 22.04+**
-
-```bash
-# Install ydotool for text injection
-sudo apt install ydotool
-```
-
-**Fedora 38+**
-
-```bash
-# Install ydotool
-sudo dnf install ydotool
-
-# Enable ydotool service
-sudo systemctl enable --now ydotool.service
-```
 
 ## Advanced Setup
 
@@ -376,6 +331,8 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 EOF
 ```
+
+You can also use the script [create-desktop-entry.sh](scripts/create-desktop-entry.sh)
 
 ### Development Mode
 
