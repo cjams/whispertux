@@ -6,7 +6,7 @@ Uses [whisper.cpp](https://github.com/ggml-org/whisper.cpp) for offline speech-t
 No fancy GPUs are required although whisper.cpp is capable of using them if available. Once your speech is transcribed, it is sent to a
 [ydotool daemon](https://github.com/ReimuNotMoe/ydotool) that will write the text into the focused application.
 
-Super useful voice prompting AI models and speaking terminal commands.
+Super useful for voice prompting AI models and speaking terminal commands.
 
 Here's a quick [demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
 
