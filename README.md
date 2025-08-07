@@ -8,7 +8,9 @@ No fancy GPUs are required although whisper.cpp is capable of using them if avai
 
 Super useful voice prompting AI models and speaking terminal commands.
 
-[Demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
+Here's a quick [demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
+
+## Screenshots
 
 ![whispertux-main](assets/whispertux-main.png)
 ![whispertux-settings](assets/whispertux-settings.png)
@@ -166,7 +168,6 @@ bash download-ggml-model.sh base.en
 ## Documentation
 
 - [Architecture](docs/architecture.md) - Technical architecture and component design
-- [Development](docs/development.md) - Development setup and contribution guidelines
 - [Setup Details](docs/setup.md) - Manual installation and system configuration
 
 ## License
