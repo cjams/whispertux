@@ -11,9 +11,12 @@ Super useful voice prompting AI models and speaking terminal commands.
 Here's a quick [demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
 
 ## Screenshots
-
-![whispertux-main](assets/whispertux-main.png)
-![whispertux-settings](assets/whispertux-settings.png)
+<table align="center">
+<tr>
+<td><img src="https://raw.githubusercontent.com/cjams/whispertux/main/assets/whispertux-main.png" alt="whispertux-main" width="400"></td>
+<td><img src="https://raw.githubusercontent.com/cjams/whispertux/main/assets/whispertux-settings.png" alt="whispertux-settings" width="400"></td>
+</tr>
+</table>
 
 ## Features
 
