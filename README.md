@@ -6,8 +6,7 @@ No fancy GPUs are required although whisper.cpp is capable of using them if avai
 
 Super useful voice prompting AI models and speaking terminal commands. 
 
-
-https://github.com/user-attachments/assets/6f7a2d26-06ae-4ba3-bdc8-1e3cba1b04be
+[Demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
 
 
 
