@@ -228,12 +228,6 @@ class TextInjector:
         self.use_clipboard_fallback = use_clipboard
         print(f"Clipboard fallback {'enabled' if use_clipboard else 'disabled'}")
 
-    def test_injection(self) -> bool:
-        """Test text injection with a simple test string"""
-        test_text = "WhisperTux test injection"
-        print(f"Testing text injection with: '{test_text}'")
-        return self.inject_text(test_text)
-
     def get_status(self) -> dict:
         """Get the status of the text injector"""
         return {

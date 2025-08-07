@@ -246,36 +246,3 @@ class WhisperManager:
                     break  # Don't add both versions of same model
         
         return sorted(available_models)
-    
-    def stop_current_transcription(self):
-        """Stop any currently running transcription process"""
-        if self.current_process and self.current_process.poll() is None:
-            try:
-                self.current_process.terminate()
-                self.current_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.current_process.kill()
-            except Exception as e:
-                print(f"Error stopping transcription: {e}")
-            finally:
-                self.current_process = None
-    
-    def test_transcription(self) -> bool:
-        """Test whisper with a simple audio file to verify it's working"""
-        try:
-            # Create a simple test audio (1 second of sine wave at 440Hz)
-            duration = 1.0
-            sample_rate = 16000
-            frequency = 440
-            
-            t = np.linspace(0, duration, int(sample_rate * duration), False)
-            test_audio = 0.1 * np.sin(2 * np.pi * frequency * t)
-            
-            # Try to transcribe (this will likely return empty but tests the pipeline)
-            result = self.transcribe_audio(test_audio, sample_rate)
-            print(f"✓ Whisper test completed (result: '{result}')")
-            return True
-            
-        except Exception as e:
-            print(f"✗ Whisper test failed: {e}")
-            return False

@@ -341,7 +341,7 @@ class GlobalShortcuts:
         test_triggered = threading.Event()
         
         def test_callback():
-            print("🎯 Test shortcut triggered!")
+            print("Test shortcut triggered!")
             test_triggered.set()
         
         # Set test callback
@@ -379,36 +379,10 @@ class GlobalShortcuts:
         except:
             pass
 
-
 # Utility functions for key handling
 def normalize_key_name(key_name: str) -> str:
     """Normalize key names for consistent parsing"""
     return key_name.lower().strip().replace(' ', '')
-
-
-def get_available_function_keys() -> List[str]:
-    """Get a list of available function keys for shortcuts"""
-    return [f'F{i}' for i in range(1, 13)]
-
-
-def get_suggested_shortcuts() -> List[str]:
-    """Get a list of commonly used shortcut combinations including Super key"""
-    return [
-        'F12',
-        'F11', 
-        'F10',
-        'Ctrl+F12',
-        'Ctrl+F11',
-        'Ctrl+F10',
-        'Ctrl+X',
-        'Alt+F12',
-        'Shift+F12',
-        'Super+F12',
-        'Super+F11',
-        'Super+F10',
-        'Super+X'
-    ]
-
 
 def get_available_keyboards() -> List[Dict[str, str]]:
     """Get a list of available keyboard devices for selection"""
