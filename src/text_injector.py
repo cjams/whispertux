@@ -58,13 +58,6 @@ class TextInjector:
         # Preprocess the text to handle unwanted carriage returns and speech-to-text corrections
         processed_text = self._preprocess_text(text)
         
-        # Show preprocessing result if text was changed
-        if processed_text != text:
-            print(f"Original text: '{text}'")
-            print(f"Processed text: '{processed_text}'")
-        else:
-            print(f"Injecting text: '{processed_text}'")
-
         try:
             # Try ydotool first if available
             if self.ydotool_available:
@@ -160,17 +153,16 @@ class TextInjector:
             )
 
             if result.returncode == 0:
-                print("✓ ydotool injection successful")
                 return True
             else:
-                print(f"✗ ydotool failed: {result.stderr}")
+                print(f"ERROR: ydotool failed: {result.stderr}")
                 return False
 
         except subprocess.TimeoutExpired:
-            print("✗ ydotool command timed out")
+            print("ERROR: ydotool command timed out")
             return False
         except Exception as e:
-            print(f"✗ ydotool injection failed: {e}")
+            print(f"ERROR: ydotool injection failed: {e}")
             return False
 
     def _inject_via_clipboard(self, text: str) -> bool:
@@ -198,10 +190,10 @@ class TextInjector:
                 )
 
                 if result.returncode != 0:
-                    print(f"⚠️  ydotool paste command failed: {result.stderr}")
+                    print(f"  ydotool paste command failed: {result.stderr}")
             else:
-                print("⚠️  No method available to send paste command")
-                print("    Text has been copied to clipboard - paste manually with Ctrl+V")
+                print("No method available to send paste command")
+                print("   Text has been copied to clipboard - paste manually with Ctrl+V")
 
             # Restore original clipboard after a delay
             def restore_clipboard():
@@ -216,11 +208,11 @@ class TextInjector:
             restore_thread = threading.Thread(target=restore_clipboard, daemon=True)
             restore_thread.start()
 
-            print("✓ Text copied to clipboard and paste command sent")
+            print("Text copied to clipboard and paste command sent")
             return True
 
         except Exception as e:
-            print(f"✗ Clipboard injection failed: {e}")
+            print(f"ERROR: Clipboard injection failed: {e}")
             return False
 
     def set_typing_speed(self, wpm: int):

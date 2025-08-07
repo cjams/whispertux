@@ -44,7 +44,7 @@ class WhisperManager:
             
             # Check if whisper binary exists
             if not self.whisper_binary.exists():
-                print(f"✗ Whisper binary not found at: {self.whisper_binary}")
+                print(f"ERROR: Whisper binary not found at: {self.whisper_binary}")
                 print("  Please build whisper.cpp first by running the build scripts")
                 return False
             
@@ -53,18 +53,18 @@ class WhisperManager:
             
             # Check if model exists
             if not self.model_path.exists():
-                print(f"✗ Whisper model not found at: {self.model_path}")
+                print(f"ERROR: Whisper model not found at: {self.model_path}")
                 print(f"  Please download the {self.current_model} model first")
                 return False
             
-            print(f"✓ Whisper binary found: {self.whisper_binary}")
-            print(f"✓ Using model: {self.current_model} at {self.model_path}")
+            print(f"Whisper binary found: {self.whisper_binary}")
+            print(f"Using model: {self.current_model} at {self.model_path}")
             
             self.ready = True
             return True
             
         except Exception as e:
-            print(f"✗ Failed to initialize Whisper manager: {e}")
+            print(f"ERROR: Failed to initialize Whisper manager: {e}")
             return False
     
     def is_ready(self) -> bool:
@@ -148,8 +148,6 @@ class WhisperManager:
                 '--threads', '4'
             ]
             
-            print(f"Running whisper command: {' '.join(cmd)}")
-            
             # Run the command
             result = subprocess.run(
                 cmd,
@@ -197,7 +195,7 @@ class WhisperManager:
             new_model_path = self.config.get_whisper_model_path(model_name)
             
             if not new_model_path.exists():
-                print(f"✗ Model {model_name} not found at {new_model_path}")
+                print(f"ERROR: Model {model_name} not found at {new_model_path}")
                 return False
             
             # Update current model
@@ -207,11 +205,11 @@ class WhisperManager:
             # Update config
             self.config.set_setting('model', model_name)
             
-            print(f"✓ Switched to model: {model_name}")
+            print(f"Switched to model: {model_name}")
             return True
             
         except Exception as e:
-            print(f"✗ Failed to set model {model_name}: {e}")
+            print(f"ERROR: Failed to set model {model_name}: {e}")
             return False
     
     def get_current_model(self) -> str:

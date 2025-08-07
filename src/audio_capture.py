@@ -60,7 +60,7 @@ class AudioCapture:
                     device_info = sd.query_devices(device=self.preferred_device_id, kind='input')
                     if device_info['max_input_channels'] > 0:
                         sd.default.device[0] = self.preferred_device_id
-                        print(f"✓ Using configured audio device: {device_info['name']} (ID: {self.preferred_device_id})")
+                        print(f"Using configured audio device: {device_info['name']} (ID: {self.preferred_device_id})")
                     else:
                         print(f"⚠ Configured device {self.preferred_device_id} has no input channels, using default")
                         self.preferred_device_id = None
@@ -79,7 +79,7 @@ class AudioCapture:
                 device_info = sd.query_devices(device=current_device_id, kind='input')
                 host_api_info = sd.query_hostapis(device_info['hostapi'])
                 
-                print(f"✓ Using audio input device: {device_info['name']}")
+                print(f"Using audio input device: {device_info['name']}")
                 print(f"  Device ID: {current_device_id}")
                 print(f"  Sample Rate: {device_info['default_samplerate']:.0f} Hz")
                 print(f"  Max Input Channels: {device_info['max_input_channels']}")
@@ -91,12 +91,12 @@ class AudioCapture:
                 
             except Exception as e:
                 print(f"⚠ Could not query device details: {e}")
-                print("✓ Using default audio input device")
+                print("Using default audio input device")
                 self.device_info = None
                 self.device_id = None
             
         except Exception as e:
-            print(f"✗ Failed to initialize sounddevice: {e}")
+            print(f"ERROR: Failed to initialize sounddevice: {e}")
             self.device_info = None
             self.device_id = None
     
@@ -109,7 +109,7 @@ class AudioCapture:
                 marker = "*" if i == sd.default.device[0] else " "
                 print(f"{marker} {i}: {device['name']} ({device['max_input_channels']} in, {device['max_output_channels']} out)")
             
-            print(f"✓ Using system default input device")
+            print(f"Using system default input device")
             
         except Exception as e:
             print(f"⚠ Could not query audio devices: {e}")
@@ -168,7 +168,7 @@ class AudioCapture:
                     sd.default.device[0] = device_id
                     self.device_info = device_info
                     self.device_id = device_id
-                    print(f"✓ Audio device changed to: {device_info['name']} (ID: {device_id})")
+                    print(f"Audio device changed to: {device_info['name']} (ID: {device_id})")
                     return True
                 else:
                     print(f"Device {device_id} has no input channels")
@@ -276,11 +276,11 @@ class AudioCapture:
             self.record_thread = threading.Thread(target=self._record_audio, daemon=True)
             self.record_thread.start()
             
-            print(f"✓ Started recording at {self.sample_rate}Hz")
+            print(f"Started recording at {self.sample_rate}Hz")
             return True
             
         except Exception as e:
-            print(f"✗ Failed to start recording: {e}")
+            print(f"ERROR: Failed to start recording: {e}")
             self.is_recording = False
             return False
     
@@ -305,7 +305,7 @@ class AudioCapture:
             if self.audio_data:
                 # Concatenate all audio chunks
                 audio_array = np.concatenate(self.audio_data, axis=0)
-                print(f"✓ Recording stopped, captured {len(audio_array)} samples")
+                print(f"Recording stopped, captured {len(audio_array)} samples")
                 return audio_array
             else:
                 print("No audio data recorded")
@@ -323,10 +323,12 @@ class AudioCapture:
                     if self.is_recording:
                         # Store the audio data (indata is already numpy array)
                         audio_chunk = indata[:, 0]  # Get mono channel
-                        self.audio_data.append(audio_chunk.copy())
                         
                         # Update current audio level for monitoring
                         self.current_level = np.sqrt(np.mean(audio_chunk**2))
+                        
+                        # Store audio data
+                        self.audio_data.append(audio_chunk.copy())
             
             # Determine device to use for recording
             device_to_use = self.preferred_device_id if self.preferred_device_id is not None else None
@@ -463,10 +465,10 @@ class AudioCapture:
                 wav_file.setframerate(self.sample_rate)
                 wav_file.writeframes(audio_int16.tobytes())
                 
-            print(f"✓ Audio saved to {filename}")
+            print(f"Audio saved to {filename}")
             
         except Exception as e:
-            print(f"✗ Failed to save audio: {e}")
+            print(f"ERROR: Failed to save audio: {e}")
     
     def __del__(self):
         """Cleanup when object is destroyed"""

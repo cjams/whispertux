@@ -211,8 +211,6 @@ class GlobalShortcuts:
         except Exception as e:
             print(f"Error in keyboard event loop: {e}")
         
-        print("Keyboard event loop stopped")
-    
     def _remove_device(self, device: InputDevice):
         """Remove a disconnected device from monitoring"""
         try:
@@ -262,7 +260,6 @@ class GlobalShortcuts:
     def start(self) -> bool:
         """Start listening for global shortcuts"""
         if self.is_running:
-            print("Global shortcuts already running")
             return True
             
         # Rediscover keyboards if devices list is empty
@@ -271,7 +268,7 @@ class GlobalShortcuts:
             self._discover_keyboards()
             
         if not self.devices:
-            print("✗ No keyboard devices available")
+            print("No keyboard devices available")
             return False
             
         try:
@@ -280,11 +277,11 @@ class GlobalShortcuts:
             self.listener_thread.start()
             self.is_running = True
             
-            print(f"✓ Global shortcuts started, listening for {self.primary_key}")
+            print(f"Global shortcuts started, listening for {self.primary_key}")
             return True
             
         except Exception as e:
-            print(f"✗ Failed to start global shortcuts: {e}")
+            print(f"Failed to start global shortcuts: {e}")
             return False
     
     def stop(self):
@@ -304,8 +301,6 @@ class GlobalShortcuts:
             
             self.is_running = False
             self.pressed_keys.clear()
-            
-            print("✓ Global shortcuts stopped")
             
         except Exception as e:
             print(f"Error stopping global shortcuts: {e}")
@@ -328,11 +323,11 @@ class GlobalShortcuts:
             self.primary_key = new_key
             self.target_keys = new_target_keys
             
-            print(f"✓ Updated global shortcut to: {new_key}")
+            print(f"Updated global shortcut to: {new_key}")
             return True
             
         except Exception as e:
-            print(f"✗ Failed to update shortcut: {e}")
+            print(f"Failed to update shortcut: {e}")
             return False
     
     def test_shortcut(self) -> bool:
@@ -351,10 +346,10 @@ class GlobalShortcuts:
         
         # Wait for test trigger
         if test_triggered.wait(timeout=10):
-            print("✓ Shortcut test successful!")
+            print("Shortcut test successful!")
             result = True
         else:
-            print("✗ Shortcut test failed - no trigger detected")
+            print("ERROR: Shortcut test failed - no trigger detected")
             result = False
         
         # Restore original callback

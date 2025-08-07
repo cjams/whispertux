@@ -30,7 +30,7 @@ class WhisperLogger:
     def success(self, message: str, prefix: str = "SUCCESS"):
         """Log success message with green styling"""
         text = Text()
-        text.append("✓ ", style="bold green")
+        text.append("SUCCESS: ", style="bold green")
         text.append(f"[{prefix}] ", style="bold green")
         text.append(message)
         self.console.print(text)
@@ -38,7 +38,7 @@ class WhisperLogger:
     def warning(self, message: str, prefix: str = "WARNING"):
         """Log warning message with yellow styling"""
         text = Text()
-        text.append("⚠ ", style="bold yellow")
+        text.append("WARNING: ", style="bold yellow")
         text.append(f"[{prefix}] ", style="bold yellow")
         text.append(message)
         self.console.print(text)
@@ -46,7 +46,7 @@ class WhisperLogger:
     def error(self, message: str, prefix: str = "ERROR"):
         """Log error message with red styling"""
         text = Text()
-        text.append("✗ ", style="bold red")
+        text.append("ERROR: ", style="bold red")
         text.append(f"[{prefix}] ", style="bold red")
         text.append(message)
         self.error_console.print(text)

@@ -16,7 +16,6 @@ class ConfigManager:
         # Default configuration values
         self.default_config = {
             'primary_shortcut': 'F12',
-            'secondary_shortcut': 'ctrl+F12', 
             'model': 'base',
             'typing_speed': 150,
             'use_clipboard': False,
@@ -59,7 +58,7 @@ class ConfigManager:
                     
                 # Merge loaded config with defaults (preserving any new default keys)
                 self.config.update(loaded_config)
-                print(f"✓ Configuration loaded from {self.config_file}")
+                print(f"Configuration loaded from {self.config_file}")
             else:
                 print("No existing configuration found, using defaults")
                 # Save default configuration
@@ -74,7 +73,7 @@ class ConfigManager:
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
-            print(f"✓ Configuration saved to {self.config_file}")
+            print(f"Configuration saved to {self.config_file}")
             return True
         except Exception as e:
             print(f"Error: Could not save configuration: {e}")
@@ -101,8 +100,6 @@ class ConfigManager:
         """Update shortcut configuration"""
         if primary is not None:
             self.config['primary_shortcut'] = primary
-        if secondary is not None:
-            self.config['secondary_shortcut'] = secondary
             
         return self.save_config()
     

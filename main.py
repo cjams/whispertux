@@ -420,7 +420,7 @@ class SettingsDialog:
         selected_shortcut = self.shortcut_var.get()
         
         if not selected_shortcut:
-            self.test_status_label.config(text="❌ No shortcut selected", bootstyle=DANGER)
+            self.test_status_label.config(text="ERROR: No shortcut selected", bootstyle=DANGER)
             return
             
         self.test_status_label.config(text="🔄 Testing...", bootstyle=WARNING)
@@ -994,9 +994,9 @@ class WhisperTuxApp:
                 device_path=device_path
             )
             self.global_shortcuts.start()
-            print(f"✓ Global shortcuts initialized")
+            print(f"Global shortcuts initialized")
         except Exception as e:
-            print(f"✗ Failed to setup global shortcuts: {e}")
+            print(f"ERROR: Failed to setup global shortcuts: {e}")
             # Still allow the app to run without global shortcuts
         
     def _start_audio_monitor(self):
@@ -1107,16 +1107,23 @@ class WhisperTuxApp:
         self._reset_audio_level()
         
         if transcription and transcription.strip():
-            # Display in UI
-            self.transcription_text.insert(tk.END, f"{transcription}\n")
-            self.transcription_text.see(tk.END)
+            # Filter out blank audio responses from whisper
+            cleaned_transcription = transcription.strip()
             
-            # Inject text into focused application
-            try:
-                self.text_injector.inject_text(transcription.strip())
-            except Exception as e:
-                print(f"Failed to inject text: {e}")
-                self.status_label.config(text="❌ Text injection failed", bootstyle="danger")
+            # Check for various blank audio indicators that should not be injected
+            blank_indicators = ["[BLANK_AUDIO]", "[blank_audio]", "(blank)", "(silence)", "[silence]", ""]
+            is_blank = any(indicator in cleaned_transcription.lower() for indicator in ["[blank_audio]", "(blank)", "(silence)", "[silence]"]) or cleaned_transcription == "[BLANK_AUDIO]"
+            
+            if not is_blank and cleaned_transcription:
+                # Display in UI
+                self.transcription_text.insert(tk.END, f"{cleaned_transcription}\n")
+                self.transcription_text.see(tk.END)
+                
+                # Inject text into focused application
+                try:
+                    self.text_injector.inject_text(cleaned_transcription)
+                except Exception as e:
+                    self.status_label.config(text="❌ Text injection failed", bootstyle="danger")
         else:
             # Don't show popup for no speech detected, just update status
             print("No speech detected")
