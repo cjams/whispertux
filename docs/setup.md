@@ -362,16 +362,3 @@ echo "Session: $XDG_SESSION_TYPE"
 echo "Python: $(python3 --version)"
 echo "Audio: $(pactl info | grep 'Server Name')"
 ```
-
-## What's Next?
-
-Once WhisperTux is working:
-
-- Read [ARCHITECTURE.md](ARCHITECTURE.md) to understand the internals
-- Practice voice commands and find your optimal workflow
-- Customize hotkeys and UI to match your preferences
-- Share your setup and contribute improvements
-
----
-
-**Still having trouble?** Open an issue at [GitHub Issues](https://github.com/cjams/whispertux/issues/new) with your system details and a description of the problem.
