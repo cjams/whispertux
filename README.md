@@ -10,6 +10,9 @@ Super useful voice prompting AI models and speaking terminal commands.
 
 [Demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
 
+![whispertux-main](assets/whispertux-main.png)
+![whispertux-settings](assets/whispertux-settings.png)
+
 ## Features
 
 - Local speech-to-text processing via whisper.cpp (no cloud dependencies)
@@ -20,7 +23,7 @@ Super useful voice prompting AI models and speaking terminal commands.
 
 ## Installation
 
-Run the complete setup script:
+Run the setup script:
 
 ```bash
 git clone https://github.com/cjams/whispertux

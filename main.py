@@ -221,7 +221,7 @@ class SettingsDialog:
         
         self.test_button = ttk.Button(
             test_frame,
-            text="🧪 Test Shortcut",
+            text="Test Shortcut",
             command=self._test_shortcut,
             bootstyle=INFO,
             width=15
