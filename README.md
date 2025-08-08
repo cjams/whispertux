@@ -73,6 +73,11 @@ This will:
 You can say 'tux enter' to simulate Enter keypress after you're done speaking for
 automated carriage return.
 
+You can also add overrides that will replace words before writing the
+final output text. For example, if you want every instance of 'duck' to
+be replaced by 'squirrel', you would add an override in the Word Overrides
+section with Original being 'duck'.
+
 ## Configuration
 
 Settings are stored in `~/.config/whispertux/config.json`:
