@@ -62,11 +62,12 @@ class WaveformVisualizer(ttk.Frame):
         # Create the matplotlib canvas
         self._create_matplotlib_canvas()
         
-        # Start animation
-        self._start_animation()
         
         # Bind resize events
         self.bind('<Configure>', self._on_resize)
+        
+        # Initial canvas draw to show static visualization
+        self.canvas.draw()
         
     def _create_matplotlib_canvas(self):
         """Create the matplotlib figure and canvas"""
@@ -160,6 +161,8 @@ class WaveformVisualizer(ttk.Frame):
                 blit=False,  # Disable blitting for better compatibility
                 cache_frame_data=False
             )
+            # Force canvas redraw
+            self.canvas.draw()
             
     def _animate_frame(self, frame):
         """Animation frame update function"""
@@ -391,6 +394,11 @@ class WaveformVisualizer(ttk.Frame):
             self.current_amplitude = 0.0
             self.amplitude_history.clear()
             self.last_smoothed_amplitude = 0.0
+    
+    def start_animation(self):
+        """Start the animation"""
+        if not self.is_active:
+            self._start_animation()
     
     def stop_animation(self):
         """Stop the animation"""

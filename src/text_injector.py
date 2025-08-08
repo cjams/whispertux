@@ -89,6 +89,9 @@ class TextInjector:
         # This prevents accidental "Enter" key presses in applications
         processed = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
         
+        # Apply user-defined word overrides first (before built-in corrections)
+        processed = self._apply_word_overrides(processed)
+        
         # Handle common speech-to-text corrections
         replacements = {
             r'\bperiod\b': '.',
@@ -135,6 +138,33 @@ class TextInjector:
         processed = re.sub(r' *\n *', '\n', processed)  # Clean spaces around newlines
         processed = processed.strip()
 
+        return processed
+    
+    def _apply_word_overrides(self, text: str) -> str:
+        """
+        Apply user-defined word overrides to the text
+        """
+        import re
+        
+        if not self.config_manager:
+            return text
+        
+        # Get word overrides from configuration
+        word_overrides = self.config_manager.get_word_overrides()
+        
+        if not word_overrides:
+            return text
+        
+        processed = text
+        
+        # Apply each override using word boundary matching for accuracy
+        for original, replacement in word_overrides.items():
+            if original and replacement:
+                # Use word boundaries to match whole words only
+                # This prevents partial word replacements
+                pattern = r'\b' + re.escape(original) + r'\b'
+                processed = re.sub(pattern, replacement, processed, flags=re.IGNORECASE)
+        
         return processed
 
     def _inject_via_ydotool(self, text: str) -> bool:

@@ -22,7 +22,8 @@ class ConfigManager:
             'window_position': None,
             'always_on_top': True,
             'theme': 'darkly',
-            'audio_device': None  # None means use system default
+            'audio_device': None,  # None means use system default
+            'word_overrides': {}  # Dictionary of word replacements: {"original": "replacement"}
         }
         
         # Set up config directory and file path
@@ -151,3 +152,22 @@ class ConfigManager:
         temp_dir = Path(__file__).parent.parent / "temp"
         temp_dir.mkdir(exist_ok=True)
         return temp_dir
+    
+    def get_word_overrides(self) -> Dict[str, str]:
+        """Get the word overrides dictionary"""
+        return self.config.get('word_overrides', {}).copy()
+    
+    def add_word_override(self, original: str, replacement: str):
+        """Add or update a word override"""
+        if 'word_overrides' not in self.config:
+            self.config['word_overrides'] = {}
+        self.config['word_overrides'][original.lower().strip()] = replacement.strip()
+    
+    def remove_word_override(self, original: str):
+        """Remove a word override"""
+        if 'word_overrides' in self.config:
+            self.config['word_overrides'].pop(original.lower().strip(), None)
+    
+    def clear_word_overrides(self):
+        """Clear all word overrides"""
+        self.config['word_overrides'] = {}

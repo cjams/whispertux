@@ -69,6 +69,9 @@ class SettingsDialog:
         # Additional Settings Section
         self._create_general_section(self.scrollable_dialog_frame)
         
+        # Word Overrides Section
+        self._create_word_overrides_section(self.scrollable_dialog_frame)
+        
         # Buttons
         self._create_buttons(self.scrollable_dialog_frame)
         
@@ -379,6 +382,192 @@ class SettingsDialog:
             width=35
         )
         keyboard_combo.pack(side=RIGHT)
+    
+    def _create_word_overrides_section(self, parent):
+        """Create the word overrides configuration section"""
+        overrides_frame = ttk.LabelFrame(parent, text="Word Overrides", padding=15)
+        overrides_frame.pack(fill=X, pady=(0, 15))
+        
+        # Instructions
+        info_label = ttk.Label(
+            overrides_frame,
+            text="Configure word replacements (e.g., 'tech' → 'tek'):",
+            font=("Arial", 10),
+            bootstyle=INFO
+        )
+        info_label.pack(anchor=W, pady=(0, 10))
+        
+        # Current overrides list
+        list_frame = ttk.Frame(overrides_frame)
+        list_frame.pack(fill=X, pady=(0, 10))
+        
+        # Create treeview for overrides list
+        columns = ('original', 'replacement')
+        self.overrides_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=4)
+        self.overrides_tree.heading('original', text='Original')
+        self.overrides_tree.heading('replacement', text='Replacement')
+        self.overrides_tree.column('original', width=120)
+        self.overrides_tree.column('replacement', width=120)
+        
+        # Scrollbar for treeview
+        tree_scrollbar = ttk.Scrollbar(list_frame, orient=VERTICAL, command=self.overrides_tree.yview)
+        self.overrides_tree.configure(yscrollcommand=tree_scrollbar.set)
+        
+        self.overrides_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        tree_scrollbar.pack(side=RIGHT, fill=Y)
+        
+        # Load current overrides
+        self._refresh_overrides_list()
+        
+        # Add new override section
+        add_frame = ttk.Frame(overrides_frame)
+        add_frame.pack(fill=X, pady=(10, 10))
+        
+        # Entry fields for new override
+        ttk.Label(add_frame, text="Add Override:", font=("Arial", 9, "bold")).pack(anchor=W)
+        
+        input_frame = ttk.Frame(add_frame)
+        input_frame.pack(fill=X, pady=(5, 0))
+        
+        ttk.Label(input_frame, text="Original:").pack(side=LEFT)
+        self.original_entry = ttk.Entry(input_frame, width=15)
+        self.original_entry.pack(side=LEFT, padx=(5, 10))
+        
+        ttk.Label(input_frame, text="→").pack(side=LEFT)
+        
+        ttk.Label(input_frame, text="Replacement:").pack(side=LEFT, padx=(10, 5))
+        self.replacement_entry = ttk.Entry(input_frame, width=15)
+        self.replacement_entry.pack(side=LEFT, padx=(5, 10))
+        
+        # Buttons for managing overrides
+        buttons_frame = ttk.Frame(overrides_frame)
+        buttons_frame.pack(fill=X, pady=(10, 0))
+        
+        add_button = ttk.Button(
+            buttons_frame,
+            text="Add Override",
+            command=self._add_word_override,
+            bootstyle=SUCCESS,
+            width=12
+        )
+        add_button.pack(side=LEFT)
+        
+        edit_button = ttk.Button(
+            buttons_frame,
+            text="Edit Selected",
+            command=self._edit_word_override,
+            bootstyle=INFO,
+            width=12
+        )
+        edit_button.pack(side=LEFT, padx=(5, 0))
+        
+        delete_button = ttk.Button(
+            buttons_frame,
+            text="Delete Selected",
+            command=self._delete_word_override,
+            bootstyle=WARNING,
+            width=15
+        )
+        delete_button.pack(side=LEFT, padx=(5, 0))
+        
+        clear_all_button = ttk.Button(
+            buttons_frame,
+            text="Clear All",
+            command=self._clear_all_overrides,
+            bootstyle=DANGER,
+            width=10
+        )
+        clear_all_button.pack(side=RIGHT)
+        
+        # Bind double-click to edit
+        self.overrides_tree.bind('<Double-1>', lambda e: self._edit_word_override())
+        
+    def _refresh_overrides_list(self):
+        """Refresh the word overrides list display"""
+        # Clear current items
+        for item in self.overrides_tree.get_children():
+            self.overrides_tree.delete(item)
+        
+        # Load overrides from config
+        word_overrides = self.config.get_word_overrides()
+        
+        # Add items to tree
+        for original, replacement in word_overrides.items():
+            self.overrides_tree.insert('', 'end', values=(original, replacement))
+    
+    def _add_word_override(self):
+        """Add a new word override"""
+        original = self.original_entry.get().strip()
+        replacement = self.replacement_entry.get().strip()
+        
+        if not original or not replacement:
+            messagebox.showwarning("Invalid Input", "Both original and replacement words are required.")
+            return
+        
+        # Check if override already exists
+        existing_overrides = self.config.get_word_overrides()
+        if original.lower() in existing_overrides:
+            if messagebox.askyesno("Override Exists", 
+                f"An override for '{original}' already exists. Do you want to update it?"):
+                # Update existing override
+                self.config.add_word_override(original, replacement)
+                self._refresh_overrides_list()
+                # Clear entry fields
+                self.original_entry.delete(0, tk.END)
+                self.replacement_entry.delete(0, tk.END)
+            return
+        
+        # Add new override
+        self.config.add_word_override(original, replacement)
+        self._refresh_overrides_list()
+        
+        # Clear entry fields
+        self.original_entry.delete(0, tk.END)
+        self.replacement_entry.delete(0, tk.END)
+    
+    def _edit_word_override(self):
+        """Edit the selected word override"""
+        selection = self.overrides_tree.selection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select an override to edit.")
+            return
+        
+        # Get selected item values
+        item = selection[0]
+        values = self.overrides_tree.item(item, 'values')
+        original, replacement = values
+        
+        # Populate entry fields with current values
+        self.original_entry.delete(0, tk.END)
+        self.original_entry.insert(0, original)
+        self.replacement_entry.delete(0, tk.END)
+        self.replacement_entry.insert(0, replacement)
+        
+        # Remove the old override (we'll add the new one when user clicks Add)
+        self.config.remove_word_override(original)
+        self._refresh_overrides_list()
+    
+    def _delete_word_override(self):
+        """Delete the selected word override"""
+        selection = self.overrides_tree.selection()
+        if not selection:
+            messagebox.showinfo("No Selection", "Please select an override to delete.")
+            return
+        
+        # Get selected item values
+        item = selection[0]
+        values = self.overrides_tree.item(item, 'values')
+        original = values[0]
+        
+        if messagebox.askyesno("Confirm Delete", f"Delete override for '{original}'?"):
+            self.config.remove_word_override(original)
+            self._refresh_overrides_list()
+    
+    def _clear_all_overrides(self):
+        """Clear all word overrides"""
+        if messagebox.askyesno("Confirm Clear All", "Are you sure you want to clear all word overrides?"):
+            self.config.clear_word_overrides()
+            self._refresh_overrides_list()
         
     def _create_buttons(self, parent):
         """Create dialog action buttons"""
@@ -618,6 +807,15 @@ class SettingsDialog:
                 if self.current_shortcut_label:
                     self.current_shortcut_label.config(text=new_shortcut)
                 
+                # Refresh word overrides list (will be empty after reset)
+                if hasattr(self, '_refresh_overrides_list'):
+                    self._refresh_overrides_list()
+                
+                # Clear override entry fields
+                if hasattr(self, 'original_entry') and hasattr(self, 'replacement_entry'):
+                    self.original_entry.delete(0, tk.END)
+                    self.replacement_entry.delete(0, tk.END)
+                
                 self.test_status_label.config(text="Settings reset to defaults", bootstyle=INFO)
                 
             except Exception as e:
@@ -729,8 +927,6 @@ class WhisperTuxApp:
         self._create_transcription_section()
         self._create_control_buttons()
         
-        # Start the audio level monitor
-        self._start_audio_monitor()
         
     def _create_scrollable_main_frame(self):
         """Create a scrollable main frame for the application"""
@@ -1015,8 +1211,14 @@ class WhisperTuxApp:
                 except:
                     break
                     
-        thread = threading.Thread(target=monitor_audio, daemon=True)
-        thread.start()
+        self.monitor_thread = threading.Thread(target=monitor_audio, daemon=True)
+        self.monitor_thread.start()
+        
+    def _stop_audio_monitor(self):
+        """Stop the audio level monitoring thread"""
+        if hasattr(self, 'monitor_thread') and self.monitor_thread and self.monitor_thread.is_alive():
+            # The monitor_audio function checks for self.root existence, so setting it to None will stop the loop
+            pass  # Thread will stop automatically when recording ends
         
     def _update_audio_level(self, level):
         """Update the waveform visualizer with audio level data (called from main thread)"""
@@ -1045,6 +1247,11 @@ class WhisperTuxApp:
         try:
             self.is_recording = True
             self._update_ui_recording_state()
+            
+            # Start audio monitoring and waveform animation for live visualization
+            self._start_audio_monitor()
+            if self.waveform_visualizer:
+                self.waveform_visualizer.start_animation()
             
             # Start audio capture in a separate thread
             def record_audio():
@@ -1103,7 +1310,10 @@ class WhisperTuxApp:
         
     def _handle_transcription(self, transcription):
         """Handle completed transcription"""
-        # Reset audio level bar after recording
+        # Stop audio monitoring, animation, and reset audio level bar after recording
+        self._stop_audio_monitor()
+        if self.waveform_visualizer:
+            self.waveform_visualizer.stop_animation()
         self._reset_audio_level()
         
         if transcription and transcription.strip():
