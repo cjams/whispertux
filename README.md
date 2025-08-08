@@ -3,7 +3,7 @@
 Simple voice dictation application for Linux. Press the shortcut key, speak, press the shortcut key again, and text will appear in whatever app owns the cursor at the time.
 
 Uses [whisper.cpp](https://github.com/ggml-org/whisper.cpp) for offline speech-to-text transcription.
-No fancy GPUs are required although whisper.cpp is capable of using them if available. Once your speech is transcribed, it is sent to a
+No fancy GPUs are required although whisper.cpp is capable of using them if you have one available. Once your speech is transcribed, it is sent to a
 [ydotool daemon](https://github.com/ReimuNotMoe/ydotool) that will write the text into the focused application.
 
 Super useful for voice prompting AI models and speaking terminal commands.
