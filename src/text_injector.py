@@ -168,11 +168,14 @@ class TextInjector:
         return processed
 
     def _inject_via_ydotool(self, text: str) -> bool:
-        """Inject text using ydotool with --key-delay 50 and raw text (no escaping)"""
+        """Inject text using ydotool using raw text (no escaping)"""
         try:
-            cmd = ['ydotool', 'type', '--key-delay', '50', text]
+            milliseconds_in_minute = 60000
+            desired_delay = milliseconds_in_minute / self.typing_speed
+
+            cmd = ['ydotool', 'type', '--key-delay', str(desired_delay), text]
             
-            print(f"Injecting text with ydotool: ydotool type --key-delay 50 [text]")
+            print(f"Injecting text with ydotool: ydotool type --key-delay "+ str(desired_delay) +" [text]")
 
             # Run the command
             result = subprocess.run(
@@ -244,11 +247,17 @@ class TextInjector:
         except Exception as e:
             print(f"ERROR: Clipboard injection failed: {e}")
             return False
+            
+    def set_typing_speed(self, cpm: int):
+        """Applies the typing speed CPM"""
+        self.typing_speed = cpm
+        print(f"Typing speed set to {self.typing_speed} CPM")
 
-    def set_typing_speed(self, wpm: int):
-        """Set the typing speed in words per minute (10-200 WPM)"""
-        self.typing_speed = max(10, min(200, wpm))
-        print(f"Typing speed set to {self.typing_speed} WPM")
+    def validate_typing_speed(self, cpm: int):
+        """Validates a desired CPM value and returns a value that is clamped between a desired value"""
+        max_speed = 2000
+        min_speed = 10
+        return max(min_speed, min(cpm, max_speed))
 
     def set_use_clipboard_fallback(self, use_clipboard: bool):
         """Enable or disable clipboard fallback"""
