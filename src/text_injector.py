@@ -168,11 +168,11 @@ class TextInjector:
         return processed
 
     def _inject_via_ydotool(self, text: str) -> bool:
-        """Inject text using ydotool with --delay 50 and raw text (no escaping)"""
+        """Inject text using ydotool with --key-delay 50 and raw text (no escaping)"""
         try:
-            cmd = ['ydotool', 'type', '--delay', '50', text]
+            cmd = ['ydotool', 'type', '--key-delay', '50', text]
             
-            print(f"Injecting text with ydotool: ydotool type --delay 50 [text]")
+            print(f"Injecting text with ydotool: ydotool type --key-delay 50 [text]")
 
             # Run the command
             result = subprocess.run(
