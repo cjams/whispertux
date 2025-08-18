@@ -90,7 +90,8 @@ Settings are stored in `~/.config/whispertux/config.json`:
   "use_clipboard": false,
   "always_on_top": true,
   "theme": "darkly",
-  "audio_device": null
+  "audio_device": null,
+  "inject_strategy": "type" // or "paste" instantly 
 }
 ```
 

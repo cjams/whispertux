@@ -662,10 +662,13 @@ class SettingsDialog:
             selected_keyboard_index = self.keyboard_options.index(self.keyboard_device_var.get())
             selected_keyboard_path = self.keyboard_values[selected_keyboard_index]
 
+            # Preform validation
+            typing_speed = self.text_injector.validate_typing_speed(self.typing_speed_var.get())
+
             # Update all settings in config
             self.config.set_setting('primary_shortcut', new_shortcut)
             self.config.set_setting('always_on_top', self.always_on_top_var.get())
-            self.config.set_setting('typing_speed', self.typing_speed_var.get())
+            self.config.set_setting('typing_speed', typing_speed)
             self.config.set_setting('use_clipboard', self.use_clipboard_var.get())
             self.config.set_setting('keyboard_device', selected_keyboard_path)
 
@@ -717,6 +720,9 @@ class SettingsDialog:
             # Call the update callback to refresh main window display
             if self.update_callback:
                 self.update_callback()
+
+            # Apply changes
+            self.text_injector.set_typing_speed(typing_speed)
 
             # Close the dialog (settings saved successfully)
             self._close_dialog()

@@ -3,6 +3,8 @@ Text injector for WhisperTux
 Handles injecting transcribed text into other applications using ydotool
 """
 
+import os
+import shutil
 import subprocess
 import time
 import pyperclip
@@ -20,26 +22,33 @@ class TextInjector:
         if self.config_manager:
             self.typing_speed = self.config_manager.get_setting('typing_speed', 150)
             self.use_clipboard_fallback = self.config_manager.get_setting('use_clipboard', False)
+            # Optional knobs (safe if missing)
+            self.inject_strategy = self.config_manager.get_setting('inject_strategy', 'type')  # 'type' or 'paste'
+            self.clipboard_clear_delay = self.config_manager.get_setting('clipboard_clear_delay', 2.0)  # seconds
         else:
-            self.typing_speed = 150  # Default WPM
+            self.typing_speed = 150  # Default WPM/CPM (see _compute_key_delay_ms)
             self.use_clipboard_fallback = False
+            self.inject_strategy = 'type'
+            self.clipboard_clear_delay = 2.0  # Default 2 seconds
 
-        # Check if ydotool is available
+        # Validate clipboard clear delay
+        self.clipboard_clear_delay = self._validate_clipboard_clear_delay(self.clipboard_clear_delay)
+
+        # Detect available injectors
         self.ydotool_available = self._check_ydotool()
 
         if not self.ydotool_available:
-            print("⚠️  ydotool not found - text injection will use clipboard fallback")
+            print("⚠️  No typing backend found (ydotool). Will use clipboard fallback.")
 
     def _check_ydotool(self) -> bool:
-        """Check if ydotool is available on the atiystem"""
+        """Check if ydotool is available on the system"""
         try:
-            result = subprocess.run(['which', 'ydotool'],
-                                  capture_output=True, text=True, timeout=5)
+            result = subprocess.run(['which', 'ydotool'], capture_output=True, text=True, timeout=5)
             return result.returncode == 0
-
-
-        except:
+        except Exception:
             return False
+
+    # ------------------------ Public API ------------------------
 
     def inject_text(self, text: str) -> bool:
         """
@@ -55,22 +64,26 @@ class TextInjector:
             print("No text to inject (empty or whitespace)")
             return True
 
-        # Preprocess the text to handle unwanted carriage returns and speech-to-text corrections
-        processed_text = self._preprocess_text(text)
-        
+        # Preprocess; also trim trailing newlines (avoid unwanted Enter)
+        processed_text = self._preprocess_text(text).rstrip("\r\n")
+
         try:
-            # Try ydotool first if available
-            if self.ydotool_available:
-                return self._inject_via_ydotool(processed_text)
-            else:
-                # Fall back to clipboard method
-                return self._inject_via_clipboard(processed_text)
+            # Use strategy-based injection
+            if self.inject_strategy == "paste":
+                if self.ydotool_available:
+                    return self._inject_via_clipboard_and_hotkey(processed_text)
+                else:
+                    return self._inject_via_clipboard(processed_text)
+            else:  # "type" strategy
+                if self.ydotool_available:
+                    return self._inject_via_ydotool(processed_text)
+                else:
+                    return self._inject_via_clipboard(processed_text)
 
         except Exception as e:
             print(f"Primary injection method failed: {e}")
 
-            # Try clipboard fallback if ydotool failed
-            if self.ydotool_available and self.use_clipboard_fallback:
+            if self.use_clipboard_fallback:
                 print("Falling back to clipboard method...")
                 try:
                     return self._inject_via_clipboard(processed_text)
@@ -79,20 +92,40 @@ class TextInjector:
 
             return False
 
+    # ------------------------ Helpers ------------------------
+
+    def _compute_key_delay_ms(self) -> int:
+        """
+        Convert configured typing speed to per-key delay for ydotool.
+        If value <= 500, treat as WPM (≈5 chars/word). Otherwise treat as CPM.
+        Clamp to [0, 1000] ms and round to int.
+        """
+        try:
+            speed = int(self.typing_speed)
+        except Exception:
+            speed = 150
+        speed = max(10, min(speed, 2000))
+        if speed <= 500:
+            cpm = speed * 5
+        else:
+            cpm = speed
+        delay = 60000 / max(1, cpm)  # ms per character
+        delay = int(round(delay))
+        return max(0, min(delay, 1000))
+
     def _preprocess_text(self, text: str) -> str:
         """
         Preprocess text to handle common speech-to-text corrections and remove unwanted line breaks
         """
         import re
-        
-        # First, convert unwanted carriage returns and newlines to spaces
-        # This prevents accidental "Enter" key presses in applications
+
+        # Normalize line breaks to spaces to avoid unintended "Enter"
         processed = text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
-        
-        # Apply user-defined word overrides first (before built-in corrections)
+
+        # Apply user-defined overrides first
         processed = self._apply_word_overrides(processed)
-        
-        # Handle common speech-to-text corrections
+
+        # Built-in speech-to-text replacements
         replacements = {
             r'\bperiod\b': '.',
             r'\bcomma\b': ',',
@@ -133,59 +166,69 @@ class TextInjector:
         for pattern, replacement in replacements.items():
             processed = re.sub(pattern, replacement, processed, flags=re.IGNORECASE)
 
-        # Clean up extra spaces but preserve intentional newlines
-        processed = re.sub(r'[ \t]+', ' ', processed)  # Multiple spaces/tabs to single space
-        processed = re.sub(r' *\n *', '\n', processed)  # Clean spaces around newlines
+        # Collapse runs of whitespace, preserve intentional newlines
+        processed = re.sub(r'[ \t]+', ' ', processed)
+        processed = re.sub(r' *\n *', '\n', processed)
         processed = processed.strip()
 
         return processed
-    
+
     def _apply_word_overrides(self, text: str) -> str:
-        """
-        Apply user-defined word overrides to the text
-        """
+        """Apply user-defined word overrides to the text"""
         import re
-        
+
         if not self.config_manager:
             return text
-        
-        # Get word overrides from configuration
+
         word_overrides = self.config_manager.get_word_overrides()
-        
         if not word_overrides:
             return text
-        
+
         processed = text
-        
-        # Apply each override using word boundary matching for accuracy
         for original, replacement in word_overrides.items():
             if original and replacement:
-                # Use word boundaries to match whole words only
-                # This prevents partial word replacements
                 pattern = r'\b' + re.escape(original) + r'\b'
                 processed = re.sub(pattern, replacement, processed, flags=re.IGNORECASE)
-        
+
         return processed
 
-    def _inject_via_ydotool(self, text: str) -> bool:
-        """Inject text using ydotool with --delay 50 and raw text (no escaping)"""
-        try:
-            cmd = ['ydotool', 'type', '--delay', '50', text]
-            
-            print(f"Injecting text with ydotool: ydotool type --delay 50 [text]")
+    # ------------------------ Backends ------------------------
 
-            # Run the command
+    def _inject_via_ydotool(self, text: str) -> bool:
+        """
+        Inject using ydotool.
+        - For 'paste' strategy: use clipboard then Ctrl+V keystroke (fast).
+        - For 'type' strategy: stream text via stdin with --key-delay.
+        """
+        if self.inject_strategy == "paste":
+            return self._inject_via_clipboard_and_hotkey(text)
+
+        try:
+            delay = self._compute_key_delay_ms()
+            cmd = ['ydotool', 'type', '--key-delay', str(delay), '--file', '-']
+
+            # Respect YDOTOOL_SOCKET; default to $XDG_RUNTIME_DIR/.ydotool_socket
+            env = os.environ.copy()
+            if "YDOTOOL_SOCKET" not in env:
+                xdg = env.get("XDG_RUNTIME_DIR")
+                if xdg:
+                    env["YDOTOOL_SOCKET"] = os.path.join(xdg, ".ydotool_socket")
+
+            print(f"Injecting text with ydotool: type (delay={delay}ms) via {env.get('YDOTOOL_SOCKET','<default>')}")
             result = subprocess.run(
                 cmd,
+                input=text.encode("utf-8"),
                 capture_output=True,
-                text=True,
-                timeout=60
+                text=False,
+                timeout=60,
+                env=env,
             )
 
             if result.returncode == 0:
                 return True
             else:
-                print(f"ERROR: ydotool failed: {result.stderr}")
+                stderr = (result.stderr or b"").decode("utf-8", "ignore")
+                print(f"ERROR: ydotool failed: {stderr}")
                 return False
 
         except subprocess.TimeoutExpired:
@@ -195,70 +238,143 @@ class TextInjector:
             print(f"ERROR: ydotool injection failed: {e}")
             return False
 
+    # ------------------------ Clipboard paths ------------------------
+
+    def _inject_via_clipboard_and_hotkey(self, text: str) -> bool:
+        """Fast path: copy to clipboard, then press Ctrl+V via ydotool."""
+        try:
+            # 1) Set clipboard (prefer wl-copy on Wayland)
+            if shutil.which("wl-copy"):
+                subprocess.run(["wl-copy"], input=text.encode("utf-8"), check=True)
+            else:
+                pyperclip.copy(text)
+
+            time.sleep(0.12)  # settle so the target app sees the new clipboard
+
+            # 2) Press Ctrl+V
+            if self.ydotool_available:
+                # Linux evdev codes: 29 = LeftCtrl, 47 = 'V'
+                result = subprocess.run(['ydotool', 'key', '29:1', '47:1', '47:0', '29:0'], capture_output=True, timeout=5)
+                if result.returncode != 0:
+                    stderr = (result.stderr or b"").decode("utf-8", "ignore")
+                    print(f"  ydotool paste command failed: {stderr}")
+                    return False
+                return True
+
+            print("No key-injection tool available; text is on the clipboard.")
+            return True
+
+        except Exception as e:
+            print(f"Clipboard+hotkey injection failed: {e}")
+            return False
+
+        finally:
+            # Clear clipboard after specified delay (non-blocking)
+            self._schedule_clipboard_clear()
+
     def _inject_via_clipboard(self, text: str) -> bool:
-        """Inject text using clipboard + paste key combination"""
+        """Copy text to clipboard and (optionally) send paste; restore previous clipboard later."""
         try:
             # Save current clipboard content
             try:
                 original_clipboard = pyperclip.paste()
-            except:
+            except Exception:
                 original_clipboard = ""
 
             # Set new clipboard content
-            pyperclip.copy(text)
-
-            # Small delay to ensure clipboard is set
-            time.sleep(0.1)
-
-            # Paste using ydotool Ctrl+V (if ydotool is available)
-            if self.ydotool_available:
-                # Use ydotool to send Ctrl+V
-                result = subprocess.run(
-                    ['ydotool', 'key', '29:1', '47:1', '47:0', '29:0'],
-                    capture_output=True,
-                    timeout=5
-                )
-
-                if result.returncode != 0:
-                    print(f"  ydotool paste command failed: {result.stderr}")
+            if shutil.which("wl-copy"):
+                subprocess.run(["wl-copy"], input=text.encode("utf-8"), check=True)
             else:
-                print("No method available to send paste command")
-                print("   Text has been copied to clipboard - paste manually with Ctrl+V")
+                pyperclip.copy(text)
 
-            # Restore original clipboard after a delay
+            # Optional: auto-paste if ydotool present
+            pasted = False
+            if self.ydotool_available:
+                r = subprocess.run(['ydotool', 'key', '29:1', '47:1', '47:0', '29:0'], capture_output=True, timeout=5)
+                pasted = (r.returncode == 0)
+
+            # Restore original clipboard after a delay (non-blocking)
             def restore_clipboard():
-                time.sleep(2.0)  # Wait 2 seconds before restoring
+                time.sleep(2.0)
                 try:
-                    pyperclip.copy(original_clipboard)
-                except:
+                    if shutil.which("wl-copy"):
+                        subprocess.run(["wl-copy"], input=original_clipboard.encode("utf-8"), check=True)
+                    else:
+                        pyperclip.copy(original_clipboard)
+                except Exception:
                     pass  # Ignore restore errors
 
-            # Run restore in a separate thread so it doesn't block
             import threading
-            restore_thread = threading.Thread(target=restore_clipboard, daemon=True)
-            restore_thread.start()
+            threading.Thread(target=restore_clipboard, daemon=True).start()
 
-            print("Text copied to clipboard and paste command sent")
+            print("Text copied to clipboard" + (" and paste command sent" if pasted else ""))
             return True
 
         except Exception as e:
             print(f"ERROR: Clipboard injection failed: {e}")
             return False
 
-    def set_typing_speed(self, wpm: int):
-        """Set the typing speed in words per minute (10-200 WPM)"""
-        self.typing_speed = max(10, min(200, wpm))
-        print(f"Typing speed set to {self.typing_speed} WPM")
+        finally:
+            # Clear clipboard after specified delay (non-blocking)
+            self._schedule_clipboard_clear()
+
+    def _schedule_clipboard_clear(self):
+        """Schedule clipboard clearing after the configured delay"""
+        def clear_clipboard():
+            time.sleep(self.clipboard_clear_delay)
+            try:
+                if shutil.which("wl-copy"):
+                    subprocess.run(["wl-copy"], input=b"", check=True)
+                else:
+                    pyperclip.copy("")
+                print(f"Clipboard cleared after {self.clipboard_clear_delay}s delay")
+            except Exception as e:
+                print(f"Failed to clear clipboard: {e}")
+
+        import threading
+        threading.Thread(target=clear_clipboard, daemon=True).start()
+
+    def _validate_clipboard_clear_delay(self, delay: float) -> float:
+        """Validate and clamp clipboard clear delay to reasonable bounds"""
+        try:
+            delay = float(delay)
+        except (ValueError, TypeError):
+            delay = 2.0
+        
+        # Clamp between 100ms and 5 seconds
+        delay = max(0.1, min(delay, 5.0))
+        return delay
+
+    # ------------------------ Settings API ------------------------
+
+    def set_typing_speed(self, cpm: int):
+        """Applies the typing speed CPM (or WPM if <= 500; see _compute_key_delay_ms)"""
+        self.typing_speed = cpm
+        print(f"Typing speed set to {self.typing_speed}")
+
+    def validate_typing_speed(self, cpm: int):
+        """Validates a desired CPM value and returns a clamped value"""
+        max_speed = 2000
+        min_speed = 10
+        return max(min_speed, min(cpm, max_speed))
 
     def set_use_clipboard_fallback(self, use_clipboard: bool):
         """Enable or disable clipboard fallback"""
         self.use_clipboard_fallback = use_clipboard
         print(f"Clipboard fallback {'enabled' if use_clipboard else 'disabled'}")
 
+    def set_clipboard_clear_delay(self, delay_seconds: float):
+        """Set the clipboard clear delay in seconds (0.1 to 5.0)"""
+        self.clipboard_clear_delay = self._validate_clipboard_clear_delay(delay_seconds)
+        print(f"Clipboard clear delay set to {self.clipboard_clear_delay}s")
+
     def get_status(self) -> dict:
         """Get the status of the text injector"""
         return {
             'ydotool_available': self.ydotool_available,
             'typing_speed': self.typing_speed,
-            'use_clipboard_fallback': self.use_clipboard_fallback
+            'use_clipboard_fallback': self.use_clipboard_fallback,
+            'inject_strategy': self.inject_strategy,
+            'clipboard_clear_delay': self.clipboard_clear_delay,
         }
+
