@@ -1307,10 +1307,11 @@ class WhisperTuxApp:
             try:
                 # Stop audio capture and get the recorded data
                 audio_data = self.audio_capture.stop_recording()
+                sample_rate = self.audio_capture.sample_rate
 
                 if audio_data is not None and len(audio_data) > 0:
                     # Transcribe the audio
-                    transcription = self.whisper_manager.transcribe_audio(audio_data)
+                    transcription = self.whisper_manager.transcribe_audio(audio_data, sample_rate=sample_rate)
 
                     # Update UI and inject text on main thread (only if root still exists)
                     if hasattr(self, 'root') and self.root:
