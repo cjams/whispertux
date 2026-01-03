@@ -17,7 +17,8 @@ class AudioCapture:
     
     def __init__(self, device_id=None):
         # Audio configuration - whisper.cpp prefers 16kHz mono
-        self.sample_rate = 16000
+        self.target_sample_rate = 16000
+        self.sample_rate = self.target_sample_rate
         self.channels = 1
         self.chunk_size = 1024
         self.dtype = np.float32
@@ -75,7 +76,12 @@ class AudioCapture:
             # Get and display detailed device information
             try:
                 # Get current input device info
-                current_device_id = sd.default.device[0] if sd.default.device[0] is not None else sd.default.device
+                current_device_id = None
+                if isinstance(sd.default.device, (list, tuple)) and len(sd.default.device) > 0:
+                    current_device_id = sd.default.device[0]
+                elif isinstance(sd.default.device, int):
+                    current_device_id = sd.default.device
+
                 device_info = sd.query_devices(device=current_device_id, kind='input')
                 host_api_info = sd.query_hostapis(device_info['hostapi'])
                 
@@ -88,6 +94,9 @@ class AudioCapture:
                 # Store device info for later use
                 self.device_info = device_info
                 self.device_id = current_device_id
+
+                # Verify the device actually supports our target sample rate, otherwise fall back
+                self._ensure_supported_samplerate()
                 
             except Exception as e:
                 print(f"⚠ Could not query device details: {e}")
@@ -99,6 +108,46 @@ class AudioCapture:
             print(f"ERROR: Failed to initialize sounddevice: {e}")
             self.device_info = None
             self.device_id = None
+
+    def _ensure_supported_samplerate(self):
+        """Make sure the input device supports our preferred sample rate."""
+        if self.device_id is None:
+            return
+
+        try:
+            sd.check_input_settings(device=self.device_id, samplerate=self.target_sample_rate)
+            self.sample_rate = self.target_sample_rate
+            sd.default.samplerate = self.sample_rate
+        except Exception:
+            if not self._fallback_to_device_samplerate():
+                print(f"⚠ Could not validate sample rate support, continuing with {self.sample_rate}Hz")
+
+    def _fallback_to_device_samplerate(self):
+        """Switch to the device's default sample rate when 16kHz is unavailable."""
+        fallback_rate = self._get_device_default_samplerate()
+        if fallback_rate:
+            fallback_rate = int(fallback_rate)
+            if fallback_rate != self.sample_rate:
+                self.sample_rate = fallback_rate
+                sd.default.samplerate = self.sample_rate
+                print(f"Input device does not support {self.target_sample_rate}Hz, falling back to {self.sample_rate}Hz")
+                return True
+        return False
+
+    def _get_device_default_samplerate(self):
+        """Return the device's default sample rate if available."""
+        try:
+            if self.device_id is not None:
+                info = sd.query_devices(device=self.device_id, kind='input')
+            elif isinstance(sd.default.device, (list, tuple)) and len(sd.default.device) > 0 and sd.default.device[0] is not None:
+                info = sd.query_devices(device=sd.default.device[0], kind='input')
+            elif isinstance(sd.default.device, int) and sd.default.device >= 0:
+                info = sd.query_devices(device=sd.default.device, kind='input')
+            else:
+                info = sd.query_devices(kind='input')
+            return info.get('default_samplerate')
+        except Exception:
+            return None
     
     def _set_system_default_device(self):
         """Set system default device when no specific device is configured"""
@@ -168,6 +217,7 @@ class AudioCapture:
                     sd.default.device[0] = device_id
                     self.device_info = device_info
                     self.device_id = device_id
+                    self._ensure_supported_samplerate()
                     print(f"Audio device changed to: {device_info['name']} (ID: {device_id})")
                     return True
                 else:
@@ -333,19 +383,27 @@ class AudioCapture:
             # Determine device to use for recording
             device_to_use = self.preferred_device_id if self.preferred_device_id is not None else None
             
-            # Start audio stream with callback - explicitly specify device
-            with sd.InputStream(
-                device=device_to_use,
-                samplerate=self.sample_rate,
-                channels=self.channels,
-                dtype=self.dtype,
-                blocksize=self.chunk_size,
-                callback=audio_callback
-            ):
-                # Keep recording while is_recording is True
-                while self.is_recording:
-                    time.sleep(0.1)
-                    
+            # Attempt to open the stream, retrying once if sample rate is invalid
+            while True:
+                try:
+                    with sd.InputStream(
+                        device=device_to_use,
+                        samplerate=self.sample_rate,
+                        channels=self.channels,
+                        dtype=self.dtype,
+                        blocksize=self.chunk_size,
+                        callback=audio_callback
+                    ):
+                        # Keep recording while is_recording is True
+                        while self.is_recording:
+                            time.sleep(0.1)
+                    break
+                except sd.PortAudioError as e:
+                    if "Invalid sample rate" in str(e) and self._fallback_to_device_samplerate():
+                        print(f"Retrying recording with supported sample rate {self.sample_rate}Hz")
+                        continue
+                    raise
+                   
         except Exception as e:
             print(f"Error in recording thread: {e}")
         finally:
