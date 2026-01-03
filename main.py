@@ -309,6 +309,19 @@ class SettingsDialog:
         )
         always_on_top_check.pack(anchor=W)
 
+        # Hold to record setting
+        hold_to_record_frame = ttk.Frame(general_frame)
+        hold_to_record_frame.pack(fill=X, pady=(5, 5))
+
+        self.hold_to_record_var = tk.BooleanVar(value=self.config.get_setting('hold_to_record', True))
+        hold_to_record_check = ttk.Checkbutton(
+            hold_to_record_frame,
+            text="Hold to record (hold hotkey to record, release to stop)",
+            variable=self.hold_to_record_var,
+            bootstyle="round-toggle"
+        )
+        hold_to_record_check.pack(anchor=W)
+
         # Use clipboard option (moved above typing speed)
         clipboard_frame = ttk.Frame(general_frame)
         clipboard_frame.pack(fill=X, pady=(5, 5))
@@ -676,6 +689,7 @@ class SettingsDialog:
             self.config.set_setting('always_on_top', self.always_on_top_var.get())
             self.config.set_setting('use_clipboard', self.use_clipboard_var.get())
             self.config.set_setting('keyboard_device', selected_keyboard_path)
+            self.config.set_setting('hold_to_record', self.hold_to_record_var.get())
 
             # Update model setting if changed
             new_model = self.model_var.get()
@@ -696,27 +710,27 @@ class SettingsDialog:
             # Update parent window's always on top setting
             self.parent.attributes('-topmost', self.always_on_top_var.get())
 
-            # Handle shortcut changes
+            # Handle shortcut changes or hold_to_record mode changes
             shortcut_update_success = True
-            if new_shortcut != old_shortcut:
+            old_hold_to_record = self.config.get_setting('hold_to_record', True)
+            new_hold_to_record = self.hold_to_record_var.get()
+
+            if new_shortcut != old_shortcut or new_hold_to_record != old_hold_to_record:
                 if self.global_shortcuts:
-                    print(f"Updating global shortcut from {old_shortcut} to {new_shortcut}")
+                    print(f"Updating global shortcuts (shortcut={new_shortcut}, hold_to_record={new_hold_to_record})")
                     # Stop the current shortcuts listener
                     self.global_shortcuts.stop()
 
-                    # Update the shortcut key
-                    self.global_shortcuts.update_shortcut(new_shortcut)
-
-                    # Start the listener with the new shortcut
-                    if not self.global_shortcuts.start():
-                        print("Failed to restart global shortcuts")
-                        messagebox.showwarning("Warning",
-                            f"Settings saved successfully, but failed to activate shortcut '{new_shortcut}'. "
-                            f"The shortcut may not work until application restart.")
-                        shortcut_update_success = False
-                    else:
-                        print(f"Successfully activated new shortcut: {new_shortcut}")
+                    # Need to recreate the shortcuts with new mode
+                    if self.app_instance:
+                        self.app_instance._setup_global_shortcuts()
                         shortcut_update_success = True
+                    else:
+                        print("Failed to restart global shortcuts - no app instance")
+                        messagebox.showwarning("Warning",
+                            f"Settings saved successfully, but failed to activate shortcuts. "
+                            f"Please restart the application for changes to take effect.")
+                        shortcut_update_success = False
 
             # Update the current shortcut display in the dialog
             if self.current_shortcut_label:
@@ -792,6 +806,7 @@ class SettingsDialog:
                 self.always_on_top_var.set(self.config.get_setting('always_on_top'))
                 self.key_delay_var.set(str(self.config.get_setting('key_delay')))
                 self.use_clipboard_var.set(self.config.get_setting('use_clipboard'))
+                self.hold_to_record_var.set(self.config.get_setting('hold_to_record'))
 
                 # Update the current shortcut display in the dialog
                 if self.current_shortcut_label:
@@ -1194,14 +1209,27 @@ class WhisperTuxApp:
             from src.global_shortcuts import GlobalShortcuts
             keyboard_device = self.config.get_setting('keyboard_device', '')
             device_path = keyboard_device if keyboard_device else None
+            hold_to_record = self.config.get_setting('hold_to_record', True)
 
-            self.global_shortcuts = GlobalShortcuts(
-                primary_key=self.config.get_setting('primary_shortcut', 'F12'),
-                callback=self._toggle_recording,
-                device_path=device_path
-            )
+            if hold_to_record:
+                # Hold-to-record mode: separate press and release callbacks
+                self.global_shortcuts = GlobalShortcuts(
+                    primary_key=self.config.get_setting('primary_shortcut', 'F12'),
+                    on_press_callback=self._start_recording,
+                    on_release_callback=self._stop_recording,
+                    hold_to_record=True,
+                    device_path=device_path
+                )
+            else:
+                # Toggle mode: single callback for backward compatibility
+                self.global_shortcuts = GlobalShortcuts(
+                    primary_key=self.config.get_setting('primary_shortcut', 'F12'),
+                    callback=self._toggle_recording,
+                    hold_to_record=False,
+                    device_path=device_path
+                )
             self.global_shortcuts.start()
-            print(f"Global shortcuts initialized")
+            print(f"Global shortcuts initialized (hold_to_record={hold_to_record})")
         except Exception as e:
             print(f"ERROR: Failed to setup global shortcuts: {e}")
             # Still allow the app to run without global shortcuts

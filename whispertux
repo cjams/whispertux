@@ -1,12 +1,46 @@
 #!/bin/bash
 # WhisperTux Launcher Script
-cd "/home/cjams/dev/whispertux"
+
+# Change to the application directory
+cd "/home/e/opt/wispr-tux2"
 
 # Check if virtual environment exists
-if [ -f "/home/cjams/dev/whispertux/venv/bin/python" ]; then
-    "/home/cjams/dev/whispertux/venv/bin/python" main.py "$@"
-else
+if [ ! -f "/home/e/opt/wispr-tux2/venv/bin/python" ]; then
     echo "Error: Virtual environment not found. Please run setup.py first."
     echo "python3 setup.py"
     exit 1
+fi
+
+# If --daemon flag is passed, run in background with output redirected
+if [ "$1" == "--daemon" ] || [ "$1" == "-d" ]; then
+    # Redirect stdout and stderr to log file
+    LOG_FILE="$HOME/.local/share/whispertux/whispertux.log"
+    mkdir -p "$(dirname "$LOG_FILE")"
+
+    # Check if already running
+    if pgrep -f "whispertux.*main.py" > /dev/null; then
+        echo "WhisperTux is already running"
+        exit 0
+    fi
+
+    echo "Starting WhisperTux in daemon mode..."
+    echo "Log file: $LOG_FILE"
+
+    # Run in background at normal priority (0)
+    # Note: Cannot use negative nice without sudo. System will still prioritize active processes.
+    nohup "/home/e/opt/wispr-tux2/venv/bin/python" main.py >> "$LOG_FILE" 2>&1 &
+
+    # Give it a moment to start
+    sleep 1
+
+    # Check if it started successfully
+    if pgrep -f "whispertux.*main.py" > /dev/null; then
+        echo "✓ WhisperTux started successfully (PID: $(pgrep -f 'whispertux.*main.py'))"
+    else
+        echo "✗ Failed to start WhisperTux. Check log: $LOG_FILE"
+        exit 1
+    fi
+else
+    # Run normally in foreground at normal priority
+    "/home/e/opt/wispr-tux2/venv/bin/python" main.py "$@"
 fi

@@ -14,33 +14,40 @@ from evdev import InputDevice, categorize, ecodes
 
 class GlobalShortcuts:
     """Handles global keyboard shortcuts using evdev for hardware-level capture"""
-    
-    def __init__(self, primary_key: str = '<f12>', callback: Optional[Callable] = None, device_path: Optional[str] = None):
+
+    def __init__(self, primary_key: str = '<f12>', callback: Optional[Callable] = None, device_path: Optional[str] = None,
+                 on_press_callback: Optional[Callable] = None, on_release_callback: Optional[Callable] = None,
+                 hold_to_record: bool = False):
         self.primary_key = primary_key
-        self.callback = callback
+        self.callback = callback  # For toggle mode (backward compatibility)
+        self.on_press_callback = on_press_callback  # For hold-to-record mode
+        self.on_release_callback = on_release_callback  # For hold-to-record mode
+        self.hold_to_record = hold_to_record
         self.selected_device_path = device_path
-        
+
         # Device and event handling
         self.devices = []
         self.device_fds = {}
         self.listener_thread = None
         self.is_running = False
         self.stop_event = threading.Event()
-        
+
         # State tracking
         self.pressed_keys = set()
         self.last_trigger_time = 0
-        self.debounce_time = 0.5  # 500ms debounce to prevent double triggers
+        self.debounce_time = 0.5  # 500ms debounce to prevent double triggers (toggle mode)
+        self.shortcut_was_active = False  # Track if shortcut combo was active
         
         # Parse the primary key combination
         self.target_keys = self._parse_key_combination(primary_key)
         
         # Initialize keyboard devices
         self._discover_keyboards()
-        
+
         print(f"Global shortcuts initialized with key: {primary_key}")
         print(f"Parsed keys: {[self._keycode_to_name(k) for k in self.target_keys]}")
         print(f"Found {len(self.devices)} keyboard device(s)")
+        print(f"Mode: {'HOLD-TO-RECORD' if self.hold_to_record else 'TOGGLE'}")
         
     def _discover_keyboards(self):
         """Discover and initialize keyboard input devices"""
@@ -226,28 +233,47 @@ class GlobalShortcuts:
         """Process individual keyboard events"""
         if event.type == ecodes.EV_KEY:
             key_event = categorize(event)
-            
+
             if key_event.keystate == key_event.key_down:
                 # Key pressed
                 self.pressed_keys.add(event.code)
-                self._check_shortcut_combination()
-                
+                if self.hold_to_record:
+                    self._check_shortcut_press()
+                else:
+                    self._check_shortcut_combination()
+
             elif key_event.keystate == key_event.key_up:
                 # Key released
                 self.pressed_keys.discard(event.code)
+                if self.hold_to_record:
+                    self._check_shortcut_release()
     
     def _check_shortcut_combination(self):
-        """Check if current pressed keys match target combination"""
+        """Check if current pressed keys match target combination (toggle mode)"""
         if self.target_keys.issubset(self.pressed_keys):
             current_time = time.time()
-            
+
             # Implement debouncing
             if current_time - self.last_trigger_time > self.debounce_time:
                 self.last_trigger_time = current_time
                 self._trigger_callback()
+
+    def _check_shortcut_press(self):
+        """Check if shortcut combo is pressed (hold-to-record mode)"""
+        if self.target_keys.issubset(self.pressed_keys) and not self.shortcut_was_active:
+            # Shortcut combo just became active
+            self.shortcut_was_active = True
+            self._trigger_press_callback()
+
+    def _check_shortcut_release(self):
+        """Check if shortcut combo was released (hold-to-record mode)"""
+        if self.shortcut_was_active and not self.target_keys.issubset(self.pressed_keys):
+            # Shortcut combo is no longer active
+            self.shortcut_was_active = False
+            self._trigger_release_callback()
     
     def _trigger_callback(self):
-        """Trigger the callback function"""
+        """Trigger the callback function (toggle mode)"""
         if self.callback:
             try:
                 print(f"Global shortcut triggered: {self.primary_key}")
@@ -256,6 +282,28 @@ class GlobalShortcuts:
                 callback_thread.start()
             except Exception as e:
                 print(f"Error calling shortcut callback: {e}")
+
+    def _trigger_press_callback(self):
+        """Trigger the press callback (hold-to-record mode)"""
+        if self.on_press_callback:
+            try:
+                print(f"Global shortcut pressed: {self.primary_key}")
+                # Run callback in a separate thread to avoid blocking the listener
+                callback_thread = threading.Thread(target=self.on_press_callback, daemon=True)
+                callback_thread.start()
+            except Exception as e:
+                print(f"Error calling press callback: {e}")
+
+    def _trigger_release_callback(self):
+        """Trigger the release callback (hold-to-record mode)"""
+        if self.on_release_callback:
+            try:
+                print(f"Global shortcut released: {self.primary_key}")
+                # Run callback in a separate thread to avoid blocking the listener
+                callback_thread = threading.Thread(target=self.on_release_callback, daemon=True)
+                callback_thread.start()
+            except Exception as e:
+                print(f"Error calling release callback: {e}")
     
     def start(self) -> bool:
         """Start listening for global shortcuts"""
@@ -288,20 +336,21 @@ class GlobalShortcuts:
         """Stop listening for global shortcuts"""
         if not self.is_running:
             return
-            
+
         try:
             self.stop_event.set()
-            
+
             if self.listener_thread and self.listener_thread.is_alive():
                 self.listener_thread.join(timeout=1.0)
-            
+
             # Close all devices
             for device in self.devices[:]:  # Copy list to avoid modification during iteration
                 self._remove_device(device)
-            
+
             self.is_running = False
             self.pressed_keys.clear()
-            
+            self.shortcut_was_active = False
+
         except Exception as e:
             print(f"Error stopping global shortcuts: {e}")
     

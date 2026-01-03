@@ -27,6 +27,70 @@ Here's a quick [demo](https://www.youtube.com/watch?v=6uY2WySVNQE)
 - Automatic text injection into focused applications
 - Configurable [whisper](https://github.com/openai/whisper) models and shortcuts
 
+## Performance Optimization
+
+WhisperTux performance can be significantly improved through thread count tuning for your specific CPU.
+
+### Thread Count Tuning
+
+**Key Discovery:** Using an optimal thread count instead of all CPU cores can dramatically improve performance.
+
+**Performance Example (AMD Ryzen 7 8845HS, 8-core/16-thread):**
+- Default 4 threads: ~4.4 seconds for 11-second audio
+- Optimal 12 threads: ~3.0 seconds for same audio
+- **Improvement: ~1.5x faster transcription**
+
+**Why thread count matters:**
+- Too few threads: Underutilizes CPU capability
+- Too many threads: Cache thrashing and memory bandwidth saturation
+- Optimal count: Balances parallel processing with resource efficiency
+
+### Finding Your Optimal Thread Count
+
+**1. Check your CPU specifications:**
+```bash
+nproc  # Shows total hardware threads
+lscpu | grep "CPU(s):"  # More detailed CPU info
+```
+
+**2. Test different thread counts:**
+
+Edit `src/whisper_manager.py` (around line 147):
+```python
+# Find this line:
+'--threads', '4',
+
+# Try different values based on your CPU:
+'--threads', '12',  # Test: 4, 8, 12, 16, etc.
+```
+
+**3. Benchmark each configuration:**
+
+Create a simple benchmark script:
+```bash
+#!/bin/bash
+# Record a 10-second test audio sample first
+
+for threads in 4 8 12 16; do
+    echo "Testing $threads threads..."
+    sed -i "s/'--threads', '[0-9]*'/'--threads', '$threads'/" src/whisper_manager.py
+    time python3 main.py  # Or use your test audio
+done
+```
+
+**General Guidelines (starting points to test):**
+- 16-thread CPUs: Try 12, 8, or 4 threads
+- 12-thread CPUs: Try 8, 6, or 4 threads
+- 8-thread CPUs: Try 6, 4, or 3 threads
+- 4-thread CPUs: Try 3 or 2 threads
+
+**Note:** Optimal count varies by CPU architecture (Intel vs AMD), model, and system load. Always benchmark on your specific hardware.
+
+### Additional Documentation
+
+- **[WORKING_CONFIG.md](WORKING_CONFIG.md)** - Real-world optimized configuration example (AMD Ryzen 7 8845HS)
+- **[RECOVERY_NOTES.md](RECOVERY_NOTES.md)** - Troubleshooting guide for performance issues and build problems
+
 ## Installation
 
 Run the setup script:
