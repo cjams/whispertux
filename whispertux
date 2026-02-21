@@ -1,10 +1,11 @@
 #!/bin/bash
 # WhisperTux Launcher Script
-cd "/home/cjams/dev/whispertux"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Check if virtual environment exists
-if [ -f "/home/cjams/dev/whispertux/venv/bin/python" ]; then
-    "/home/cjams/dev/whispertux/venv/bin/python" main.py "$@"
+if [ -f "$SCRIPT_DIR/venv/bin/python" ]; then
+    "$SCRIPT_DIR/venv/bin/python" main.py "$@"
 else
     echo "Error: Virtual environment not found. Please run setup.py first."
     echo "python3 setup.py"
