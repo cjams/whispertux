@@ -15,22 +15,24 @@ from evdev import InputDevice, categorize, ecodes
 class GlobalShortcuts:
     """Handles global keyboard shortcuts using evdev for hardware-level capture"""
     
-    def __init__(self, primary_key: str = '<f12>', callback: Optional[Callable] = None, device_path: Optional[str] = None):
+    def __init__(self, primary_key: str = '<f12>', callback: Optional[Callable] = None, release_callback: Optional[Callable] = None, device_path: Optional[str] = None):
         self.primary_key = primary_key
         self.callback = callback
+        self.release_callback = release_callback
         self.selected_device_path = device_path
-        
+
         # Device and event handling
         self.devices = []
         self.device_fds = {}
         self.listener_thread = None
         self.is_running = False
         self.stop_event = threading.Event()
-        
+
         # State tracking
         self.pressed_keys = set()
         self.last_trigger_time = 0
         self.debounce_time = 0.5  # 500ms debounce to prevent double triggers
+        self.combination_active = False  # True while shortcut keys are held down
         
         # Parse the primary key combination
         self.target_keys = self._parse_key_combination(primary_key)
@@ -226,24 +228,29 @@ class GlobalShortcuts:
         """Process individual keyboard events"""
         if event.type == ecodes.EV_KEY:
             key_event = categorize(event)
-            
+
             if key_event.keystate == key_event.key_down:
                 # Key pressed
                 self.pressed_keys.add(event.code)
                 self._check_shortcut_combination()
-                
+
             elif key_event.keystate == key_event.key_up:
                 # Key released
                 self.pressed_keys.discard(event.code)
+                # If the combination was active and a target key was released, fire release callback
+                if self.combination_active and event.code in self.target_keys:
+                    self.combination_active = False
+                    self._trigger_release_callback()
     
     def _check_shortcut_combination(self):
         """Check if current pressed keys match target combination"""
         if self.target_keys.issubset(self.pressed_keys):
             current_time = time.time()
-            
+
             # Implement debouncing
             if current_time - self.last_trigger_time > self.debounce_time:
                 self.last_trigger_time = current_time
+                self.combination_active = True
                 self._trigger_callback()
     
     def _trigger_callback(self):
@@ -256,6 +263,16 @@ class GlobalShortcuts:
                 callback_thread.start()
             except Exception as e:
                 print(f"Error calling shortcut callback: {e}")
+
+    def _trigger_release_callback(self):
+        """Trigger the release callback function (for push-to-talk mode)"""
+        if self.release_callback:
+            try:
+                print(f"Global shortcut released: {self.primary_key}")
+                callback_thread = threading.Thread(target=self.release_callback, daemon=True)
+                callback_thread.start()
+            except Exception as e:
+                print(f"Error calling shortcut release callback: {e}")
     
     def start(self) -> bool:
         """Start listening for global shortcuts"""
@@ -301,6 +318,7 @@ class GlobalShortcuts:
             
             self.is_running = False
             self.pressed_keys.clear()
+            self.combination_active = False
             
         except Exception as e:
             print(f"Error stopping global shortcuts: {e}")
@@ -312,6 +330,10 @@ class GlobalShortcuts:
     def set_callback(self, callback: Callable):
         """Set the callback function for shortcut activation"""
         self.callback = callback
+
+    def set_release_callback(self, release_callback: Optional[Callable]):
+        """Set the callback function for shortcut release (push-to-talk mode)"""
+        self.release_callback = release_callback
     
     def update_shortcut(self, new_key: str) -> bool:
         """Update the shortcut key combination"""

@@ -23,7 +23,8 @@ class ConfigManager:
             'always_on_top': True,
             'theme': 'darkly',
             'audio_device': None,  # None means use system default
-            'word_overrides': {}  # Dictionary of word replacements: {"original": "replacement"}
+            'word_overrides': {},  # Dictionary of word replacements: {"original": "replacement"}
+            'push_to_talk': False  # Hold key to record, release to stop
         }
         
         # Set up config directory and file path
