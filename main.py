@@ -184,6 +184,10 @@ class SettingsDialog:
             'Super+X'
         ]
 
+        # Add Alt + letter combinations
+        for letter in 'abcdefghijklmnopqrstuvwxyz':
+            shortcut_options.append(f'Alt+{letter.upper()}')
+
         # Add Ctrl + letter combinations
         for letter in 'abcdefghijklmnopqrstuvwxyz':
             shortcut_options.append(f'Ctrl+{letter.upper()}')
@@ -238,6 +242,19 @@ class SettingsDialog:
             font=("Arial", 9),
         )
         self.test_status_label.pack(side=RIGHT, padx=(10, 0))
+
+        # Push-to-talk mode
+        ptt_frame = ttk.Frame(shortcuts_frame)
+        ptt_frame.pack(fill=X, pady=(10, 0))
+
+        self.push_to_talk_var = tk.BooleanVar(value=self.config.get_setting('push_to_talk', False))
+        ptt_check = ttk.Checkbutton(
+            ptt_frame,
+            text="Push-to-talk (hold key to record, release to stop)",
+            variable=self.push_to_talk_var,
+            bootstyle="round-toggle"
+        )
+        ptt_check.pack(anchor=W)
 
     def _create_model_section(self, parent):
         """Create the model configuration section"""
@@ -676,6 +693,7 @@ class SettingsDialog:
             self.config.set_setting('always_on_top', self.always_on_top_var.get())
             self.config.set_setting('use_clipboard', self.use_clipboard_var.get())
             self.config.set_setting('keyboard_device', selected_keyboard_path)
+            self.config.set_setting('push_to_talk', self.push_to_talk_var.get())
 
             # Update model setting if changed
             new_model = self.model_var.get()
@@ -717,6 +735,10 @@ class SettingsDialog:
                     else:
                         print(f"Successfully activated new shortcut: {new_shortcut}")
                         shortcut_update_success = True
+
+            # Apply push-to-talk mode (update callbacks on shortcuts instance)
+            if self.app_instance:
+                self.app_instance._apply_shortcut_mode()
 
             # Update the current shortcut display in the dialog
             if self.current_shortcut_label:
@@ -1194,16 +1216,30 @@ class WhisperTuxApp:
             from src.global_shortcuts import GlobalShortcuts
             keyboard_device = self.config.get_setting('keyboard_device', '')
             device_path = keyboard_device if keyboard_device else None
+            push_to_talk = self.config.get_setting('push_to_talk', False)
 
             self.global_shortcuts = GlobalShortcuts(
                 primary_key=self.config.get_setting('primary_shortcut', 'F12'),
-                callback=self._toggle_recording,
+                callback=self._start_recording if push_to_talk else self._toggle_recording,
+                release_callback=self._stop_recording if push_to_talk else None,
                 device_path=device_path
             )
             self.global_shortcuts.start()
-            print(f"Global shortcuts initialized")
+            print(f"Global shortcuts initialized (push_to_talk={push_to_talk})")
         except Exception as e:
             print(f"ERROR: Failed to setup global shortcuts: {e}")
+
+    def _apply_shortcut_mode(self):
+        """Update shortcut callbacks when push-to-talk mode changes"""
+        if self.global_shortcuts is None:
+            return
+        push_to_talk = self.config.get_setting('push_to_talk', False)
+        if push_to_talk:
+            self.global_shortcuts.set_callback(self._start_recording)
+            self.global_shortcuts.set_release_callback(self._stop_recording)
+        else:
+            self.global_shortcuts.set_callback(self._toggle_recording)
+            self.global_shortcuts.set_release_callback(None)
             # Still allow the app to run without global shortcuts
 
     def _start_audio_monitor(self):
