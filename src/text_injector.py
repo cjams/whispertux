@@ -6,6 +6,8 @@ Handles injecting transcribed text into other applications using ydotool
 import subprocess
 import time
 import pyperclip
+import os
+from pathlib import Path
 from typing import Optional
 
 
@@ -26,9 +28,12 @@ class TextInjector:
 
         # Check if ydotool is available
         self.ydotool_available = self._check_ydotool()
+        self.ydotool_socket = self._detect_ydotool_socket()
 
         if not self.ydotool_available:
             print("⚠️  ydotool not found - text injection will use clipboard fallback")
+        elif self.ydotool_socket:
+            print(f"Using ydotool socket: {self.ydotool_socket}")
 
     def _check_ydotool(self) -> bool:
         """Check if ydotool is available on the atiystem"""
@@ -40,6 +45,60 @@ class TextInjector:
 
         except:
             return False
+
+    def _detect_ydotool_socket(self) -> Optional[str]:
+        """Find the ydotoold socket used by common package/service setups."""
+        candidates = []
+
+        configured_socket = os.environ.get('YDOTOOL_SOCKET')
+        if configured_socket:
+            candidates.append(configured_socket)
+
+        runtime_dir = os.environ.get('XDG_RUNTIME_DIR')
+        if runtime_dir:
+            candidates.append(str(Path(runtime_dir) / '.ydotool_socket'))
+
+        candidates.append('/tmp/.ydotool_socket')
+
+        for socket_path in candidates:
+            if socket_path and Path(socket_path).exists():
+                return socket_path
+
+        return None
+
+    def _get_ydotool_env(self) -> dict:
+        """Build an environment that points ydotool at the detected daemon socket."""
+        env = os.environ.copy()
+        if self.ydotool_socket and not env.get('YDOTOOL_SOCKET'):
+            env['YDOTOOL_SOCKET'] = self.ydotool_socket
+        return env
+
+    def _log_ydotool_failure(self, result: subprocess.CompletedProcess):
+        """Log enough detail to diagnose ydotool daemon/socket failures."""
+        print(f"ERROR: ydotool failed with exit code {result.returncode}")
+
+        stdout = (result.stdout or '').strip()
+        stderr = (result.stderr or '').strip()
+        if stdout:
+            print(f"ydotool stdout: {stdout}")
+        if stderr:
+            print(f"ydotool stderr: {stderr}")
+        if not stdout and not stderr:
+            print("ydotool did not print any error output")
+
+        socket_path = self.ydotool_socket or os.environ.get('YDOTOOL_SOCKET')
+        if socket_path:
+            socket_file = Path(socket_path)
+            print(f"ydotool socket: {socket_path}")
+            if socket_file.exists():
+                socket_readable = os.access(socket_path, os.R_OK)
+                socket_writable = os.access(socket_path, os.W_OK)
+                print(f"ydotool socket readable={socket_readable} writable={socket_writable}")
+                if not socket_readable or not socket_writable:
+                    print("ydotool socket is not accessible by the current user.")
+                    print("Run: ./scripts/setup-ydotoold-service.sh")
+            else:
+                print("ydotool socket does not exist")
 
     def inject_text(self, text: str) -> bool:
         """
@@ -179,13 +238,14 @@ class TextInjector:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
+                env=self._get_ydotool_env()
             )
 
             if result.returncode == 0:
                 return True
             else:
-                print(f"ERROR: ydotool failed: {result.stderr}")
+                self._log_ydotool_failure(result)
                 return False
 
         except subprocess.TimeoutExpired:
@@ -216,11 +276,12 @@ class TextInjector:
                 result = subprocess.run(
                     ['ydotool', 'key', '29:1', '47:1', '47:0', '29:0'],
                     capture_output=True,
-                    timeout=5
+                    timeout=5,
+                    env=self._get_ydotool_env()
                 )
 
                 if result.returncode != 0:
-                    print(f"  ydotool paste command failed: {result.stderr}")
+                    self._log_ydotool_failure(result)
             else:
                 print("No method available to send paste command")
                 print("   Text has been copied to clipboard - paste manually with Ctrl+V")

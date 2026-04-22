@@ -141,7 +141,17 @@ If you see `failed to open uinput device` errors, run the fix script:
 ./scripts/fix-uinput-permissions.sh
 ```
 
-This script will:
+If you see `failed to connect socket` errors such as
+`/tmp/.ydotool_socket: Permission denied` or
+`$XDG_RUNTIME_DIR/.ydotool_socket: No such file or directory`, reinstall and
+restart the WhisperTux `ydotoold` service so the daemon and client use an
+accessible socket:
+
+```bash
+./scripts/setup-ydotoold-service.sh
+```
+
+The uinput fix script will:
 
 - Add your user to the `input` and `tty` groups
 - Create the necessary udev rule for `/dev/uinput` access
@@ -159,7 +169,7 @@ sudo systemctl restart ydotoold  # if needed
 Test text injection directly:
 
 ```bash
-ydotool type "test message"
+YDOTOOL_SOCKET=/tmp/.ydotool_socket ydotool type "test message"
 ```
 
 ### Whisper Model Issues

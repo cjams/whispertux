@@ -6,7 +6,10 @@
 set -e
 
 SERVICE_NAME="ydotoold"
-SERVICE_FILE="systemd/ydotoold.service"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SERVICE_FILE="$PROJECT_ROOT/systemd/ydotoold.service"
+WRAPPER_FILE="$PROJECT_ROOT/scripts/ydotoold-wrapper.sh"
 SYSTEM_SERVICE_DIR="/etc/systemd/system"
 
 echo "WhisperTux - Setting up ydotoold system service"
@@ -31,24 +34,16 @@ fi
 # Check if service file exists
 if [ ! -f "$SERVICE_FILE" ]; then
     echo "ERROR: Service file not found: $SERVICE_FILE"
-    echo "   Please ensure you're running this from the WhisperTux project directory"
     exit 1
-fi
-
-# Stop any existing ydotoold processes
-if pgrep -x "ydotoold" > /dev/null; then
-    echo "Stopping existing ydotoold processes..."
-    sudo pkill ydotoold || true
-    sleep 1
 fi
 
 # Copy wrapper script to system location
 echo "Installing ydotoold wrapper script..."
-if [ -f "scripts/ydotoold-wrapper.sh" ]; then
-    sudo cp "scripts/ydotoold-wrapper.sh" "/usr/local/bin/"
+if [ -f "$WRAPPER_FILE" ]; then
+    sudo cp "$WRAPPER_FILE" "/usr/local/bin/"
     sudo chmod +x "/usr/local/bin/ydotoold-wrapper.sh"
 else
-    echo "ERROR: Wrapper script not found: scripts/ydotoold-wrapper.sh"
+    echo "ERROR: Wrapper script not found: $WRAPPER_FILE"
     exit 1
 fi
 
@@ -60,9 +55,20 @@ sudo cp "$SERVICE_FILE" "$SYSTEM_SERVICE_DIR/"
 echo "Reloading systemd daemon..."
 sudo systemctl daemon-reload
 
+# Stop any old package-provided service before starting the corrected unit.
+echo "Stopping existing ydotoold service/processes..."
+sudo systemctl stop "$SERVICE_NAME" || true
+if YDOTOOLD_PIDS="$(pgrep -x ydotoold || true)" && [ -n "$YDOTOOLD_PIDS" ]; then
+    echo "$YDOTOOLD_PIDS" | xargs -r sudo kill
+    sleep 1
+fi
+
 # Enable the service
 echo "Enabling ydotoold service..."
 sudo systemctl enable "$SERVICE_NAME"
+
+# Clear any previous start-limit failure before starting the corrected unit.
+sudo systemctl reset-failed "$SERVICE_NAME" || true
 
 # Start the service
 echo "Starting ydotoold service..."
@@ -82,7 +88,7 @@ if pgrep -x "ydotoold" > /dev/null; then
 else
     echo ""
     echo "ERROR: ydotoold service failed to start"
-    echo "Check the service logs: sudo systemctl logs $SERVICE_NAME"
+    echo "Check the service logs: sudo journalctl -u $SERVICE_NAME --no-pager -n 100"
     exit 1
 fi
 
@@ -91,6 +97,6 @@ echo "Service management commands (run as root/sudo):"
 echo "   Start:   sudo systemctl start $SERVICE_NAME"
 echo "   Stop:    sudo systemctl stop $SERVICE_NAME"
 echo "   Status:  sudo systemctl status $SERVICE_NAME"
-echo "   Logs:    sudo systemctl logs $SERVICE_NAME"
+echo "   Logs:    sudo journalctl -u $SERVICE_NAME --no-pager -n 100"
 echo "   Restart: sudo systemctl restart $SERVICE_NAME"
 echo ""
