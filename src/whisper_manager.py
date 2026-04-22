@@ -220,27 +220,27 @@ class WhisperManager:
         """Get list of available whisper models"""
         models_dir = self.config.get_whisper_model_path('').parent
         available_models = []
-        
-        # Look for the supported model files
-        supported_models = ['tiny', 'base', 'small', 'medium', 'large']
-        
-        for model in supported_models:
-            # Check for both English-only and multilingual versions
-            model_files = [
-                models_dir / f"ggml-{model}.en.bin",  # English-only
-                models_dir / f"ggml-{model}.bin"      # Multilingual
-            ]
-            
-            for model_file in model_files:
-                if model_file.exists():
-                    # Add model name with suffix if it's English-only
-                    if model_file.name.endswith('.en.bin'):
-                        model_name = f"{model}.en"
-                    else:
-                        model_name = model
-                    
-                    if model_name not in available_models:
-                        available_models.append(model_name)
-                    break  # Don't add both versions of same model
-        
-        return sorted(available_models)
+
+        for model_file in models_dir.glob('ggml-*.bin'):
+            model_name = model_file.name[len('ggml-'):-len('.bin')]
+            if model_name and model_name not in available_models:
+                available_models.append(model_name)
+
+        model_order = {
+            'tiny': 0,
+            'base': 1,
+            'small': 2,
+            'medium': 3,
+            'large': 4,
+            'large-v1': 5,
+            'large-v2': 6,
+            'large-v3': 7,
+            'large-v3-turbo': 8,
+        }
+
+        def sort_key(model_name: str):
+            base_name = model_name[:-3] if model_name.endswith('.en') else model_name
+            variant_rank = 0 if model_name.endswith('.en') else 1
+            return (model_order.get(base_name, 100), variant_rank, model_name)
+
+        return sorted(available_models, key=sort_key)

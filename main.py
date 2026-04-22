@@ -268,32 +268,27 @@ class SettingsDialog:
         ttk.Label(model_selection_frame, text="Whisper Model:").pack(side=LEFT)
 
         # Get available models from whisper manager
-        try:
-            # Access the parent's whisper manager through the parent window
-            available_models = []
-            if hasattr(self.parent, 'whisper_manager'):
-                available_models = self.parent.whisper_manager.get_available_models()
-            if not available_models:
-                available_models = ["No models found"]
-        except:
-            available_models = ["No models found"]
+        available_models = self._get_available_models()
+        combo_values = available_models if available_models else ["No models found"]
+        current_model = self.config.get_setting('model', 'base')
 
-        self.model_var = tk.StringVar(value=self.config.get_setting('model', 'base'))
+        self.model_var = tk.StringVar(value=current_model)
         self.model_combo_dialog = ttk.Combobox(
             model_selection_frame,
             textvariable=self.model_var,
-            values=available_models,
-            state="readonly",
+            values=combo_values,
+            state="readonly" if available_models else "disabled",
             width=15
         )
         self.model_combo_dialog.pack(side=RIGHT)
 
         # Set current model if it exists
-        current_model = self.config.get_setting('model', 'base')
         if current_model in available_models:
             self.model_var.set(current_model)
-        elif available_models and available_models[0] != "No models found":
+        elif available_models:
             self.model_var.set(available_models[0])
+        else:
+            self.model_var.set("No models found")
 
         # Download Models button
         download_frame = ttk.Frame(model_frame)
@@ -307,6 +302,16 @@ class SettingsDialog:
             width=15
         )
         download_button.pack(side=RIGHT)
+
+    def _get_available_models(self):
+        """Get available models from the application whisper manager."""
+        try:
+            app = self.app_instance if self.app_instance else self.parent
+            if app and hasattr(app, 'whisper_manager'):
+                return app.whisper_manager.get_available_models()
+        except Exception as e:
+            print(f"Error loading available models: {e}")
+        return []
 
     def _create_general_section(self, parent):
         """Create the general settings section"""
@@ -696,15 +701,7 @@ class SettingsDialog:
             self.config.set_setting('push_to_talk', self.push_to_talk_var.get())
 
             # Update model setting if changed
-            new_model = self.model_var.get()
-            if new_model != "No models found":
-                self.config.set_setting('model', new_model)
-                # Update the parent's whisper manager
-                if hasattr(self.parent, 'whisper_manager'):
-                    try:
-                        self.parent.whisper_manager.set_model(new_model)
-                    except Exception as e:
-                        print(f"Failed to update model: {e}")
+            self._apply_selected_model()
 
             # Save configuration to file
             if not self.config.save_config():
@@ -779,6 +776,7 @@ class SettingsDialog:
             # Update other settings
             self.config.set_setting('always_on_top', self.always_on_top_var.get())
             self.config.set_setting('use_clipboard', self.use_clipboard_var.get())
+            self._apply_selected_model()
 
             # Save configuration
             if self.config.save_config():
@@ -801,6 +799,20 @@ class SettingsDialog:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to apply settings: {e}")
 
+    def _apply_selected_model(self):
+        """Apply the selected model to config and the running whisper manager."""
+        new_model = self.model_var.get()
+        if new_model == "No models found":
+            return
+
+        self.config.set_setting('model', new_model)
+        app = self.app_instance if self.app_instance else self.parent
+        if app and hasattr(app, 'whisper_manager'):
+            try:
+                app.whisper_manager.set_model(new_model)
+            except Exception as e:
+                print(f"Failed to update model: {e}")
+
     def _reset_defaults(self):
         """Reset settings to defaults"""
         if messagebox.askyesno("Reset Settings", "Are you sure you want to reset all settings to defaults?"):
@@ -814,6 +826,7 @@ class SettingsDialog:
                 self.always_on_top_var.set(self.config.get_setting('always_on_top'))
                 self.key_delay_var.set(str(self.config.get_setting('key_delay')))
                 self.use_clipboard_var.set(self.config.get_setting('use_clipboard'))
+                self._refresh_model_combo_dialog()
 
                 # Update the current shortcut display in the dialog
                 if self.current_shortcut_label:
@@ -844,24 +857,24 @@ class SettingsDialog:
         """Refresh the model combo box in this settings dialog"""
         try:
             # Get updated available models
-            available_models = []
-            if self.app_instance and hasattr(self.app_instance, 'whisper_manager'):
-                available_models = self.app_instance.whisper_manager.get_available_models()
-            if not available_models:
-                available_models = ["No models found"]
+            available_models = self._get_available_models()
+            combo_values = available_models if available_models else ["No models found"]
 
             # Update the combo box values
             if hasattr(self, 'model_combo_dialog') and self.model_combo_dialog:
-                self.model_combo_dialog['values'] = available_models
+                self.model_combo_dialog['values'] = combo_values
+                self.model_combo_dialog['state'] = "readonly" if available_models else "disabled"
 
                 # Update current selection if needed
                 current_model = self.config.get_setting('model', 'base')
                 if current_model in available_models:
                     self.model_var.set(current_model)
-                elif available_models and available_models[0] != "No models found":
+                elif available_models:
                     self.model_var.set(available_models[0])
+                else:
+                    self.model_var.set("No models found")
 
-                print(f"Refreshed settings dialog model combo with: {available_models}")
+                print(f"Refreshed settings dialog model combo with: {combo_values}")
         except Exception as e:
             print(f"Error refreshing settings dialog model combo: {e}")
 
