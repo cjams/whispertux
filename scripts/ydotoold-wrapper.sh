@@ -1,23 +1,25 @@
 #!/bin/bash
 
-# Wrapper script for ydotoold to set proper permissions
-# Remove existing socket
-rm -f /tmp/.ydotool_socket
+# Wrapper script for ydotoold to set socket permissions usable by WhisperTux.
+set -euo pipefail
 
-# Start ydotoold in background
-/usr/bin/ydotoold &
-YDOTOOLD_PID=$!
+SOCKET_PATH="${YDOTOOL_SOCKET:-/tmp/.ydotool_socket}"
+SOCKET_GROUP="${YDOTOOLD_SOCKET_GROUP:-input}"
 
-# Wait for socket to be created and fix permissions
-for i in {1..30}; do
-    if [ -S /tmp/.ydotool_socket ]; then
-        chmod 660 /tmp/.ydotool_socket
-        chgrp input /tmp/.ydotool_socket
-        echo "ydotoold: socket permissions fixed (660, group: input)"
-        break
-    fi
-    sleep 0.1
-done
+if ! SOCKET_GID="$(getent group "$SOCKET_GROUP" | cut -d: -f3)"; then
+    echo "ydotoold: group '$SOCKET_GROUP' does not exist" >&2
+    exit 1
+fi
 
-# Wait for ydotoold process to finish
-wait $YDOTOOLD_PID
+if [ -z "$SOCKET_GID" ]; then
+    echo "ydotoold: could not resolve gid for group '$SOCKET_GROUP'" >&2
+    exit 1
+fi
+
+rm -f "$SOCKET_PATH"
+
+# Set ownership at socket creation time so clients never see a root-only socket.
+exec /usr/bin/ydotoold \
+    --socket-path="$SOCKET_PATH" \
+    --socket-perm=0660 \
+    --socket-own="0:$SOCKET_GID"
