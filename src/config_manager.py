@@ -109,27 +109,19 @@ class ConfigManager:
         """Get the path to a whisper model file"""
         # Construct path relative to the project root
         project_root = Path(__file__).parent.parent
-        
-        # Handle different model naming conventions
-        if model_name.endswith('.en'):
-            # English-only model
-            model_filename = f"ggml-{model_name}.bin"
-        else:
-            # Multilingual model - check both .en.bin and .bin versions
-            en_model_path = project_root / "whisper.cpp" / "models" / f"ggml-{model_name}.en.bin"
-            multi_model_path = project_root / "whisper.cpp" / "models" / f"ggml-{model_name}.bin"
-            
-            # Prefer English-only version if both exist
-            if en_model_path.exists():
-                return en_model_path
-            elif multi_model_path.exists():
-                return multi_model_path
-            else:
-                # Default to English-only path for error messages
-                return en_model_path
-        
-        model_path = project_root / "whisper.cpp" / "models" / model_filename
-        return model_path
+        models_dir = project_root / "whisper.cpp" / "models"
+
+        exact_model_path = models_dir / f"ggml-{model_name}.bin"
+        if exact_model_path.exists() or model_name.endswith('.en'):
+            return exact_model_path
+
+        # Keep the historical default working when config says "base" but only
+        # the setup-downloaded English model exists as ggml-base.en.bin.
+        en_model_path = models_dir / f"ggml-{model_name}.en.bin"
+        if en_model_path.exists():
+            return en_model_path
+
+        return exact_model_path
     
     def get_whisper_binary_path(self) -> Path:
         """Get the path to the whisper binary"""

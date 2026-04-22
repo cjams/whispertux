@@ -99,6 +99,9 @@ Settings are stored in `~/.config/whispertux/config.json`:
 
 Any [whisper](https://github.com/openai/whisper) model is usable. By default the
 base model is downloaded and used. You can download additional models from within the app.
+The settings dialog lists installed `ggml-*.bin` files by model name, such as
+`base.en`, `small.en`, or `large-v3-turbo`. The default `base` setting falls
+back to `base.en` when only `ggml-base.en.bin` is installed.
 
 ## System Requirements
 
