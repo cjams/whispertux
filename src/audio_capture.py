@@ -9,7 +9,6 @@ import wave
 import threading
 import time
 from typing import Optional, Callable
-from io import BytesIO
 
 
 class AudioCapture:
@@ -44,7 +43,24 @@ class AudioCapture:
         self.stream = None
         
         # Initialize sounddevice
+        self.preferred_device_id = self.normalize_device_reference(self.preferred_device_id)
         self._initialize_sounddevice()
+
+    @staticmethod
+    def normalize_device_reference(device_id):
+        """Normalize config/device selector values into sounddevice-compatible references."""
+        if device_id is None:
+            return None
+
+        if isinstance(device_id, str):
+            normalized = device_id.strip()
+            if not normalized or normalized.lower() == 'default':
+                return None
+            if normalized.lstrip('+-').isdigit():
+                return int(normalized)
+            return normalized
+
+        return device_id
     
     def _initialize_sounddevice(self):
         """Initialize sounddevice and check for available devices"""
@@ -205,10 +221,18 @@ class AudioCapture:
     def set_device(self, device_id):
         """Set the audio input device"""
         try:
+            device_id = self.normalize_device_reference(device_id)
+
             if device_id is None:
                 # Reset to system default
                 self.preferred_device_id = None
                 sd.default.device[0] = None
+                self.device_info = None
+                self.device_id = None
+                self.sample_rate = self.target_sample_rate
+                sd.default.samplerate = self.sample_rate
+                print("Audio device changed to system default input")
+                return True
             else:
                 # Validate device exists and has input channels
                 device_info = sd.query_devices(device=device_id, kind='input')
