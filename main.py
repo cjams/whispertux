@@ -373,7 +373,7 @@ class SettingsDialog:
             available_audio_devices = AudioCapture.get_available_input_devices()
             for device in available_audio_devices:
                 audio_options.append(device['display_name'])
-                audio_values.append(device['id'])
+                audio_values.append(device['reference'])
 
         except Exception as e:
             print(f"Error getting audio devices: {e}")
@@ -387,6 +387,20 @@ class SettingsDialog:
         current_audio_index = 0
         if current_audio_device in self.audio_device_values:
             current_audio_index = self.audio_device_values.index(current_audio_device)
+        elif isinstance(current_audio_device, int):
+            for index, device in enumerate(available_audio_devices, start=1):
+                if current_audio_device == device['id']:
+                    current_audio_index = index
+                    break
+        elif isinstance(current_audio_device, dict):
+            for index, device in enumerate(available_audio_devices, start=1):
+                if device['reference']['name'] != current_audio_device.get('name'):
+                    continue
+                saved_host_api = current_audio_device.get('host_api')
+                if saved_host_api and device['reference']['host_api'] != saved_host_api:
+                    continue
+                current_audio_index = index
+                break
         elif isinstance(current_audio_device, str):
             for index, device in enumerate(available_audio_devices, start=1):
                 if current_audio_device in (device['name'], device['display_name']):
@@ -949,8 +963,8 @@ class WhisperTuxApp:
         self.config = ConfigManager()
 
         # Initialize audio capture with configured device
-        audio_device_id = self.config.get_setting('audio_device', None)
-        self.audio_capture = AudioCapture(device_id=audio_device_id)
+        audio_device_reference = self.config.get_setting('audio_device', None)
+        self.audio_capture = AudioCapture(device_reference=audio_device_reference)
 
         self.whisper_manager = WhisperManager()
         self.text_injector = TextInjector(self.config)

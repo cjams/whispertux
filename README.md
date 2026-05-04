@@ -95,6 +95,10 @@ Settings are stored in `~/.config/whispertux/config.json`:
 }
 ```
 
+When a microphone is selected in the UI, `audio_device` is saved as a stable
+device reference using the device name and host API so the same source can be
+restored across restarts even if PortAudio device indexes change.
+
 ### Available Models
 
 Any [whisper](https://github.com/openai/whisper) model is usable. By default the
