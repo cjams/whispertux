@@ -244,7 +244,7 @@ Set in configuration:
 
 ```json
 {
-  "audio_device": "default"
+  "audio_device": null
 }
 ```
 

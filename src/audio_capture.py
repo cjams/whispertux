@@ -9,13 +9,12 @@ import wave
 import threading
 import time
 from typing import Optional, Callable
-from io import BytesIO
 
 
 class AudioCapture:
     """Handles audio recording and real-time level monitoring"""
     
-    def __init__(self, device_id=None):
+    def __init__(self, device_reference=None):
         # Audio configuration - whisper.cpp prefers 16kHz mono
         self.target_sample_rate = 16000
         self.sample_rate = self.target_sample_rate
@@ -24,7 +23,8 @@ class AudioCapture:
         self.dtype = np.float32
         
         # Device configuration
-        self.preferred_device_id = device_id
+        self.preferred_device = self.normalize_device_reference(device_reference)
+        self.preferred_device_id = None
         
         # Recording state
         self.is_recording = False
@@ -45,6 +45,77 @@ class AudioCapture:
         
         # Initialize sounddevice
         self._initialize_sounddevice()
+
+    @staticmethod
+    def build_device_reference(device_name, host_api_name):
+        """Build a stable config representation for an input device."""
+        return {
+            'name': device_name,
+            'host_api': host_api_name,
+        }
+
+    @classmethod
+    def normalize_device_reference(cls, device_reference):
+        """Normalize config/device selector values into sounddevice-compatible references."""
+        if device_reference is None:
+            return None
+
+        if isinstance(device_reference, str):
+            normalized = device_reference.strip()
+            if not normalized or normalized.lower() == 'default':
+                return None
+            if normalized.lstrip('+-').isdigit():
+                return int(normalized)
+            return normalized
+
+        if isinstance(device_reference, dict):
+            device_name = str(device_reference.get('name', '')).strip()
+            host_api_name = str(device_reference.get('host_api', '')).strip()
+            if device_name:
+                normalized = cls.build_device_reference(device_name, host_api_name)
+                legacy_device_id = cls.normalize_device_reference(device_reference.get('id'))
+                if isinstance(legacy_device_id, int):
+                    normalized['id'] = legacy_device_id
+                return normalized
+            return cls.normalize_device_reference(device_reference.get('id'))
+
+        return device_reference
+
+    @classmethod
+    def _resolve_input_device_reference(cls, device_reference):
+        """Resolve a saved device reference to the current sounddevice input entry."""
+        normalized_reference = cls.normalize_device_reference(device_reference)
+        if normalized_reference is None:
+            return None
+
+        available_devices = cls.get_available_input_devices()
+
+        if isinstance(normalized_reference, int):
+            for device in available_devices:
+                if device['id'] == normalized_reference:
+                    return device
+            return None
+
+        if isinstance(normalized_reference, str):
+            for device in available_devices:
+                if normalized_reference in (device['name'], device['display_name']):
+                    return device
+            return None
+
+        if isinstance(normalized_reference, dict):
+            for device in available_devices:
+                if device['reference']['name'] != normalized_reference['name']:
+                    continue
+                saved_host_api = normalized_reference.get('host_api')
+                if saved_host_api and device['reference']['host_api'] != saved_host_api:
+                    continue
+                return device
+
+            legacy_device_id = normalized_reference.get('id')
+            if isinstance(legacy_device_id, int):
+                return cls._resolve_input_device_reference(legacy_device_id)
+
+        return None
     
     def _initialize_sounddevice(self):
         """Initialize sounddevice and check for available devices"""
@@ -55,22 +126,23 @@ class AudioCapture:
             sd.default.dtype = self.dtype
             
             # Set the preferred device if specified
-            if self.preferred_device_id is not None:
-                try:
-                    # Validate that the device exists and has input channels
-                    device_info = sd.query_devices(device=self.preferred_device_id, kind='input')
-                    if device_info['max_input_channels'] > 0:
-                        sd.default.device[0] = self.preferred_device_id
-                        print(f"Using configured audio device: {device_info['name']} (ID: {self.preferred_device_id})")
-                    else:
-                        print(f"⚠ Configured device {self.preferred_device_id} has no input channels, using default")
-                        self.preferred_device_id = None
-                except Exception as e:
-                    print(f"⚠ Configured audio device {self.preferred_device_id} not available: {e}")
+            if self.preferred_device is not None:
+                resolved_device = self._resolve_input_device_reference(self.preferred_device)
+                if resolved_device:
+                    self.preferred_device = resolved_device['reference']
+                    self.preferred_device_id = resolved_device['id']
+                    sd.default.device[0] = self.preferred_device_id
+                    print(
+                        "Using configured audio device: "
+                        f"{resolved_device['name']} ({resolved_device['host_api']}, ID: {self.preferred_device_id})"
+                    )
+                else:
+                    print(f"⚠ Configured audio device {self.preferred_device!r} not available, using default")
+                    self.preferred_device = None
                     self.preferred_device_id = None
             
             # If no specific device was configured or it failed, use system default
-            if self.preferred_device_id is None:
+            if self.preferred_device is None:
                 self._set_system_default_device()
             
             # Get and display detailed device information
@@ -179,6 +251,7 @@ class AudioCapture:
                         'channels': device['max_input_channels'],
                         'sample_rate': device['default_samplerate'],
                         'host_api': host_api_info['name'],
+                        'reference': AudioCapture.build_device_reference(device['name'], host_api_info['name']),
                         'display_name': f"{device['name']} ({host_api_info['name']})"
                     })
             
@@ -202,27 +275,39 @@ class AudioCapture:
         except:
             return None
     
-    def set_device(self, device_id):
+    def set_device(self, device_reference):
         """Set the audio input device"""
         try:
-            if device_id is None:
+            device_reference = self.normalize_device_reference(device_reference)
+
+            if device_reference is None:
                 # Reset to system default
+                self.preferred_device = None
                 self.preferred_device_id = None
                 sd.default.device[0] = None
-            else:
-                # Validate device exists and has input channels
-                device_info = sd.query_devices(device=device_id, kind='input')
-                if device_info['max_input_channels'] > 0:
-                    self.preferred_device_id = device_id
-                    sd.default.device[0] = device_id
-                    self.device_info = device_info
-                    self.device_id = device_id
-                    self._ensure_supported_samplerate()
-                    print(f"Audio device changed to: {device_info['name']} (ID: {device_id})")
-                    return True
-                else:
-                    print(f"Device {device_id} has no input channels")
-                    return False
+                self.device_info = None
+                self.device_id = None
+                self.sample_rate = self.target_sample_rate
+                sd.default.samplerate = self.sample_rate
+                print("Audio device changed to system default input")
+                return True
+
+            resolved_device = self._resolve_input_device_reference(device_reference)
+            if not resolved_device:
+                print(f"Device {device_reference!r} not available")
+                return False
+
+            self.preferred_device = resolved_device['reference']
+            self.preferred_device_id = resolved_device['id']
+            sd.default.device[0] = self.preferred_device_id
+            self.device_info = sd.query_devices(device=self.preferred_device_id, kind='input')
+            self.device_id = self.preferred_device_id
+            self._ensure_supported_samplerate()
+            print(
+                "Audio device changed to: "
+                f"{resolved_device['name']} ({resolved_device['host_api']}, ID: {self.preferred_device_id})"
+            )
+            return True
                     
         except Exception as e:
             print(f"Error setting audio device: {e}")

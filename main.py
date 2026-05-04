@@ -317,6 +317,8 @@ class SettingsDialog:
         """Create the general settings section"""
         general_frame = ttk.LabelFrame(parent, text="General Settings", padding=15)
         general_frame.pack(fill=X, pady=(0, 15))
+        field_label_width = 16
+        selector_width = 35
 
         # Always on top setting
         always_on_top_frame = ttk.Frame(general_frame)
@@ -348,7 +350,7 @@ class SettingsDialog:
         key_delay_frame = ttk.Frame(general_frame)
         key_delay_frame.pack(fill=X, pady=(5, 5))
 
-        ttk.Label(key_delay_frame, text="Key Delay (ms):").pack(side=LEFT)
+        ttk.Label(key_delay_frame, text="Key Delay (ms):", width=field_label_width, anchor=W).pack(side=LEFT)
 
         self.key_delay_var = tk.StringVar(value=str(self.config.get_setting('key_delay', 15)))
         key_delay_entry = ttk.Entry(
@@ -358,33 +360,85 @@ class SettingsDialog:
         )
         key_delay_entry.pack(side=RIGHT)
 
+        # Audio input device selection
+        audio_frame = ttk.Frame(general_frame)
+        audio_frame.pack(fill=X, pady=(5, 5))
+
+        ttk.Label(audio_frame, text="Audio Input:", width=field_label_width, anchor=W).pack(side=LEFT)
+
+        available_audio_devices = []
+        audio_options = ["System Default"]
+        audio_values = [None]
+        try:
+            available_audio_devices = AudioCapture.get_available_input_devices()
+            for device in available_audio_devices:
+                audio_options.append(device['display_name'])
+                audio_values.append(device['reference'])
+
+        except Exception as e:
+            print(f"Error getting audio devices: {e}")
+
+        self.audio_device_options = audio_options
+        self.audio_device_values = audio_values
+
+        current_audio_device = AudioCapture.normalize_device_reference(
+            self.config.get_setting('audio_device', None)
+        )
+        current_audio_index = 0
+        if current_audio_device in self.audio_device_values:
+            current_audio_index = self.audio_device_values.index(current_audio_device)
+        elif isinstance(current_audio_device, int):
+            for index, device in enumerate(available_audio_devices, start=1):
+                if current_audio_device == device['id']:
+                    current_audio_index = index
+                    break
+        elif isinstance(current_audio_device, dict):
+            for index, device in enumerate(available_audio_devices, start=1):
+                if device['reference']['name'] != current_audio_device.get('name'):
+                    continue
+                saved_host_api = current_audio_device.get('host_api')
+                if saved_host_api and device['reference']['host_api'] != saved_host_api:
+                    continue
+                current_audio_index = index
+                break
+        elif isinstance(current_audio_device, str):
+            for index, device in enumerate(available_audio_devices, start=1):
+                if current_audio_device in (device['name'], device['display_name']):
+                    current_audio_index = index
+                    break
+
+        self.audio_device_var = tk.StringVar(value=audio_options[current_audio_index])
+        audio_combo = ttk.Combobox(
+            audio_frame,
+            textvariable=self.audio_device_var,
+            values=audio_options,
+            state="readonly",
+            width=selector_width
+        )
+        audio_combo.pack(side=RIGHT)
+
         # Keyboard device selection
         keyboard_frame = ttk.Frame(general_frame)
         keyboard_frame.pack(fill=X, pady=(5, 0))
 
-        ttk.Label(keyboard_frame, text="Keyboard Device:").pack(side=LEFT)
+        ttk.Label(keyboard_frame, text="Keyboard Device:", width=field_label_width, anchor=W).pack(side=LEFT)
 
         # Get available keyboards
+        keyboard_options = ["Auto-detect (All Keyboards)"]
+        keyboard_values = [""]
         try:
             from src.global_shortcuts import get_available_keyboards
             available_keyboards = get_available_keyboards()
-
-            keyboard_options = ["Auto-detect (All Keyboards)"]
-            keyboard_values = [""]
 
             for kb in available_keyboards:
                 keyboard_options.append(kb['display_name'])
                 keyboard_values.append(kb['path'])
 
-            self.keyboard_options = keyboard_options
-            self.keyboard_values = keyboard_values
-
         except Exception as e:
             print(f"Error getting keyboard devices: {e}")
-            keyboard_options = ["Auto-detect (All Keyboards)"]
-            keyboard_values = [""]
-            self.keyboard_options = keyboard_options
-            self.keyboard_values = keyboard_values
+
+        self.keyboard_options = keyboard_options
+        self.keyboard_values = keyboard_values
 
         # Find current selection
         current_device = self.config.get_setting('keyboard_device', '')
@@ -398,7 +452,7 @@ class SettingsDialog:
             textvariable=self.keyboard_device_var,
             values=keyboard_options,
             state="readonly",
-            width=35
+            width=selector_width
         )
         keyboard_combo.pack(side=RIGHT)
 
@@ -680,6 +734,8 @@ class SettingsDialog:
             # Get keyboard device selection
             selected_keyboard_index = self.keyboard_options.index(self.keyboard_device_var.get())
             selected_keyboard_path = self.keyboard_values[selected_keyboard_index]
+            selected_audio_index = self.audio_device_options.index(self.audio_device_var.get())
+            selected_audio_device = self.audio_device_values[selected_audio_index]
 
             # Validate and update key delay setting
             key_delay_str = self.key_delay_var.get().strip()
@@ -693,10 +749,19 @@ class SettingsDialog:
                 messagebox.showwarning("Invalid Input", "Key delay must be a valid number.")
                 return
 
+            if self.app_instance and self.app_instance.audio_capture:
+                if not self.app_instance.audio_capture.set_device(selected_audio_device):
+                    messagebox.showwarning(
+                        "Audio Device Unavailable",
+                        "Failed to switch to the selected audio input. The device may have been disconnected."
+                    )
+                    return
+
             # Update all settings in config
             self.config.set_setting('primary_shortcut', new_shortcut)
             self.config.set_setting('always_on_top', self.always_on_top_var.get())
             self.config.set_setting('use_clipboard', self.use_clipboard_var.get())
+            self.config.set_setting('audio_device', selected_audio_device)
             self.config.set_setting('keyboard_device', selected_keyboard_path)
             self.config.set_setting('push_to_talk', self.push_to_talk_var.get())
 
@@ -826,6 +891,8 @@ class SettingsDialog:
                 self.always_on_top_var.set(self.config.get_setting('always_on_top'))
                 self.key_delay_var.set(str(self.config.get_setting('key_delay')))
                 self.use_clipboard_var.set(self.config.get_setting('use_clipboard'))
+                if hasattr(self, 'audio_device_var'):
+                    self.audio_device_var.set("System Default")
                 self._refresh_model_combo_dialog()
 
                 # Update the current shortcut display in the dialog
@@ -896,8 +963,8 @@ class WhisperTuxApp:
         self.config = ConfigManager()
 
         # Initialize audio capture with configured device
-        audio_device_id = self.config.get_setting('audio_device', None)
-        self.audio_capture = AudioCapture(device_id=audio_device_id)
+        audio_device_reference = self.config.get_setting('audio_device', None)
+        self.audio_capture = AudioCapture(device_reference=audio_device_reference)
 
         self.whisper_manager = WhisperManager()
         self.text_injector = TextInjector(self.config)
